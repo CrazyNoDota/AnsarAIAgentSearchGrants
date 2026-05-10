@@ -1,0 +1,14 @@
+frontend/
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.env.local
+docker-compose.yml
+backend/Dockerfile
+bot/Dockerfile
+frontend/Dockerfile
+README.md

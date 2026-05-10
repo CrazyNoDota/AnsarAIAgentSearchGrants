@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "functions": {
+    "api/index.py": { "maxDuration": 90 },
+    "api/telegram.py": { "maxDuration": 60 },
+    "api/cron/scrape.py": { "maxDuration": 300 },
+    "api/cron/score.py": { "maxDuration": 300 },
+    "api/cron/reminders.py": { "maxDuration": 60 },
+    "api/cron/digest.py": { "maxDuration": 60 }
+  },
+  "crons": [
+    { "path": "/api/cron/scrape",    "schedule": "0 2 * * *" },
+    { "path": "/api/cron/score",     "schedule": "0 3 * * *" },
+    { "path": "/api/cron/reminders", "schedule": "0 8 * * *" },
+    { "path": "/api/cron/digest",    "schedule": "0 9 * * *" }
+  ],
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/api/index" }
+  ]
+}
