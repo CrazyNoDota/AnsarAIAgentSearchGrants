@@ -15,21 +15,77 @@ from scraping.undp_grants import UNDPScraper
 from scraping.nasa_sbir import NASASBIRScraper
 from scraping.innovate_uk import InnovateUKScraper
 from scraping.nih_sbir import NIHSBIRScraper
+from scraping.corporate_programs import (
+    AWSImagineGrantScraper, GoogleForStartupsScraper,
+    MicrosoftForStartupsScraper, NVIDIAInceptionScraper,
+)
+from scraping.global_accelerators import (
+    AntlerScraper, TechstarsGrantsScraper, IFundWomenScraper,
+    GermanAcceleratorScraper, GISTNetworkScraper,
+    MiskAcceleratorScraper, KAUSTScraper,
+)
+from scraping.fellowships import (
+    HFSPScraper, SchmidtScienceScraper, QuadFellowshipScraper, BolashaqScraper,
+)
+from scraping.europe_funds import InnosuisseScraper, InnovationFundDenmarkScraper
+from scraping.latam_asia_funds import (
+    StartupChileScraper, FAPESPScraper, HongKongITFScraper,
+    KOSGEBScraper, TUBITAKScraper, AstanaHubScraper,
+)
+from scraping.intl_organizations import (
+    WFPInnovationScraper, WHOInnovationScraper, USAIDCentralAsiaScraper,
+    GatesFoundationScraper, GlobalInnovationFundScraper,
+)
 from database.connection import AsyncSessionLocal
 from models.grant import Grant
 
 logger = logging.getLogger(__name__)
 
 ALL_SCRAPERS = [
+    # US Government
     GrantsGovScraper(),
     FederalRegisterScraper(),
-    WorldBankScraper(),
     NSFScraper(),
-    EUFundingScraper(),
-    UNDPScraper(),
     NASASBIRScraper(),
-    InnovateUKScraper(),
     NIHSBIRScraper(),
+    # International Bodies
+    WorldBankScraper(),
+    UNDPScraper(),
+    WFPInnovationScraper(),
+    WHOInnovationScraper(),
+    USAIDCentralAsiaScraper(),
+    GatesFoundationScraper(),
+    GlobalInnovationFundScraper(),
+    # European
+    EUFundingScraper(),
+    InnovateUKScraper(),
+    InnosuisseScraper(),
+    InnovationFundDenmarkScraper(),
+    # Latin America & Asia
+    StartupChileScraper(),
+    FAPESPScraper(),
+    HongKongITFScraper(),
+    KOSGEBScraper(),
+    TUBITAKScraper(),
+    AstanaHubScraper(),
+    # Corporate Programs
+    AWSImagineGrantScraper(),
+    GoogleForStartupsScraper(),
+    MicrosoftForStartupsScraper(),
+    NVIDIAInceptionScraper(),
+    # Global Accelerators
+    AntlerScraper(),
+    TechstarsGrantsScraper(),
+    IFundWomenScraper(),
+    GermanAcceleratorScraper(),
+    GISTNetworkScraper(),
+    MiskAcceleratorScraper(),
+    KAUSTScraper(),
+    # Fellowships
+    HFSPScraper(),
+    SchmidtScienceScraper(),
+    QuadFellowshipScraper(),
+    BolashaqScraper(),
 ]
 
 
