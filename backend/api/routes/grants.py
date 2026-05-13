@@ -39,6 +39,16 @@ async def list_grants(
     )
 
 
+@router.get("/categories")
+async def list_categories(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Distinct grant categories with counts (used for filter menus)."""
+    service = GrantService(db)
+    return {"items": await service.list_categories()}
+
+
 @router.get("/{grant_id}", response_model=GrantResponse)
 async def get_grant(
     grant_id: int,

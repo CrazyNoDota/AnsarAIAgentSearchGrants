@@ -105,6 +105,17 @@ class GrantService:
             grant.telegram_msg_id = msg_id
             await self.db.flush()
 
+    async def list_categories(self) -> list[dict]:
+        """Return distinct non-empty categories with grant counts, sorted by count desc."""
+        result = await self.db.execute(
+            select(Grant.category, func.count(Grant.id).label("n"))
+            .where(Grant.category.is_not(None))
+            .where(Grant.category != "")
+            .group_by(Grant.category)
+            .order_by(func.count(Grant.id).desc())
+        )
+        return [{"category": row[0], "count": row[1]} for row in result.all()]
+
     async def get_stats(self) -> dict:
         result = await self.db.execute(
             select(Grant.status, func.count(Grant.id))
