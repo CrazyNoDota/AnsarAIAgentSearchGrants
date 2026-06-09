@@ -30,4 +30,10 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="⚙️ AI Insights", callback_data="menu:insights"),
             InlineKeyboardButton(text="🔄 Run Scraper", callback_data="menu:scrape"),
         ],
+        [
+            InlineKeyboardButton(text="🌐 Manage Sources", callback_data="menu:sources"),
+        ],
+        [
+            InlineKeyboardButton(text="❓ Help & Guide", callback_data="menu:help"),
+        ],
     ])

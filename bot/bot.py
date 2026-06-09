@@ -13,7 +13,7 @@ from aiogram.types import BotCommand
 
 from config import get_bot_settings
 from middlewares.auth import StaffAuthMiddleware
-from handlers import start, grants, reviews, search, subscribe, deadlines, statistics, settings, categories, chat
+from handlers import start, grants, reviews, search, subscribe, deadlines, statistics, settings, categories, sources, chat
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,6 +50,7 @@ async def main():
     dp.include_router(statistics.router)
     dp.include_router(settings.router)
     dp.include_router(categories.router)
+    dp.include_router(sources.router)
     # chat fallback MUST be last — it catches any plain-text message
     dp.include_router(chat.router)
 
@@ -67,9 +68,14 @@ async def main():
         BotCommand(command="stats", description="Database statistics"),
         BotCommand(command="insights", description="AI learning insights"),
         BotCommand(command="scrape", description="Trigger manual scrape"),
+        BotCommand(command="sources", description="List custom grant sources"),
+        BotCommand(command="addsource", description="Add a grant source URL"),
+        BotCommand(command="scrapesource", description="Scrape one source now"),
+        BotCommand(command="delsource", description="Remove a custom source"),
         BotCommand(command="subscribe", description="Subscribe to daily digest"),
         BotCommand(command="unsubscribe", description="Unsubscribe from digest"),
         BotCommand(command="delete", description="Delete a grant by ID"),
+        BotCommand(command="guide", description="How this bot works"),
         BotCommand(command="help", description="Help and command list"),
     ])
 

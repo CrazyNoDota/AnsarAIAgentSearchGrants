@@ -52,34 +52,75 @@ async def cmd_menu(message: Message):
     await message.answer(text, parse_mode="HTML", reply_markup=main_menu_keyboard())
 
 
+HELP_TEXT = (
+    "🤖 <b>AI Grant Agent — Command Reference</b>\n\n"
+    "<b>🧭 Navigation</b>\n"
+    "  /start, /menu — main menu\n"
+    "  /guide — how the whole system works\n"
+    "  /help — this list\n\n"
+    "<b>📋 Browse grants</b>\n"
+    "  /pending — new grants awaiting your review\n"
+    "  /approved — grants you approved\n"
+    "  /rejected — grants you rejected\n"
+    "  /deadlines — deadlines in the next 30 days\n\n"
+    "<b>🔎 Find grants</b>\n"
+    "  /search &lt;query&gt; — keyword + semantic search\n"
+    "  /recommend &lt;query&gt; — AI answer grounded in the verified DB\n"
+    "  /summarize &lt;id&gt; — AI summary of one grant\n\n"
+    "<b>🌐 Sources — what gets scraped</b>\n"
+    "  /sources — list your custom sources + health\n"
+    "  /addsource &lt;url&gt; [| name] — add a source to scrape\n"
+    "  /scrapesource &lt;id&gt; — scrape one source now\n"
+    "  /delsource &lt;id&gt; — remove a source\n"
+    "  /scrape — run a full scrape of every source now\n\n"
+    "<b>⚙️ Manage</b>\n"
+    "  /stats — database statistics\n"
+    "  /insights — what the AI has learned from your reviews\n"
+    "  /delete &lt;id&gt; — delete a grant\n"
+    "  /subscribe, /unsubscribe — daily digest\n\n"
+    "<b>✅ Reviewing</b>\n"
+    "Tap ✅ Approve or ❌ Reject under any grant card — the AI learns from every "
+    "decision to sharpen future recommendations.\n\n"
+    "<i>New here? Send /guide for a 1-minute walkthrough.</i>"
+)
+
+GUIDE_TEXT = (
+    "📖 <b>How the AI Grant Agent works</b>\n\n"
+    "<b>1. It collects grants</b>\n"
+    "The agent scrapes funding opportunities from three places:\n"
+    "  • 37 built-in sources (gov, EU, UN, accelerators, fellowships…)\n"
+    "  • an AI Search Agent that discovers new pages on the web\n"
+    "  • <b>your own sources</b> — any URL you add with /addsource\n\n"
+    "<b>2. It stores only verified data</b>\n"
+    "Everything found goes into a database as <b>pending</b>. Search and "
+    "recommendations answer ONLY from this database — the AI never invents grants. "
+    "An empty database means nothing has been scraped yet.\n\n"
+    "<b>3. You review</b>\n"
+    "Open /pending and tap ✅/❌ on each card. The AI learns your preferences "
+    "(see /insights) and ranks future finds accordingly.\n\n"
+    "<b>4. You search</b>\n"
+    "  • /search — fast keyword + semantic match\n"
+    "  • /recommend — an AI explanation grounded in the verified grants\n\n"
+    "<b>➕ Adding a source (most common task)</b>\n"
+    "Find a page that lists grants, then:\n"
+    "  <code>/addsource https://site.org/funding | My label</code>\n"
+    "The parser reads that page on every cycle. Pull it in immediately with "
+    "<code>/scrapesource &lt;id&gt;</code>. Check health anytime with /sources.\n\n"
+    "<b>⏰ Automatic updates</b>\n"
+    "A full scrape runs automatically every day at 02:00 (Almaty). Trigger one "
+    "manually anytime with /scrape.\n\n"
+    "<i>Full command list: /help</i>"
+)
+
+
 @router.message(Command("help"))
 async def cmd_help(message: Message):
-    await message.answer(
-        "🤖 <b>AI Grant Agent — Commands</b>\n\n"
-        "<b>Navigation:</b>\n"
-        "  /start — Main menu\n"
-        "  /menu — Show menu again\n\n"
-        "<b>Grants:</b>\n"
-        "  /pending — New grants for review\n"
-        "  /approved — Approved grants\n"
-        "  /rejected — Rejected grants\n"
-        "  /deadlines — Upcoming deadlines\n\n"
-        "<b>AI Search:</b>\n"
-        "  /search &lt;query&gt; — Keyword search\n"
-        "  /recommend &lt;query&gt; — RAG AI recommendations\n"
-        "  /summarize &lt;id&gt; — AI summary of a grant\n\n"
-        "<b>Management:</b>\n"
-        "  /stats — Database statistics\n"
-        "  /insights — AI learning insights\n"
-        "  /scrape — Trigger manual scrape\n"
-        "  /delete &lt;id&gt; — Delete a grant\n"
-        "  /subscribe — Daily digest\n"
-        "  /unsubscribe — Cancel digest\n\n"
-        "<b>Review Grants:</b>\n"
-        "Tap ✅ Approve or ❌ Reject under any grant card. "
-        "The AI learns from every decision to improve future recommendations.",
-        parse_mode="HTML",
-    )
+    await message.answer(HELP_TEXT, parse_mode="HTML", disable_web_page_preview=True)
+
+
+@router.message(Command("guide"))
+async def cmd_guide(message: Message):
+    await message.answer(GUIDE_TEXT, parse_mode="HTML", disable_web_page_preview=True)
 
 
 # ── Callback: main menu navigation ───────────────────────────
@@ -169,6 +210,18 @@ async def menu_scrape(callback: CallbackQuery):
         await callback.message.answer(
             "🔄 <b>Manual Scrape</b>\n\nUse: <code>/scrape</code> to trigger a full scrape run.",
             parse_mode="HTML",
+        )
+
+
+@router.callback_query(F.data == "menu:help")
+async def menu_help(callback: CallbackQuery):
+    await callback.answer()
+    if callback.message:
+        await callback.message.answer(
+            GUIDE_TEXT, parse_mode="HTML", disable_web_page_preview=True
+        )
+        await callback.message.answer(
+            HELP_TEXT, parse_mode="HTML", disable_web_page_preview=True
         )
 
 

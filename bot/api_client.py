@@ -181,6 +181,57 @@ async def run_scraper() -> dict:
         return resp.json()
 
 
+# ── Custom source management ──────────────────────────────────
+
+async def list_sources() -> list[dict]:
+    """List registered custom grant sources."""
+    async with httpx.AsyncClient(base_url=settings.backend_url, timeout=15) as client:
+        resp = await client.get("/scraper/sources", headers=await _headers())
+        resp.raise_for_status()
+        return resp.json().get("items", [])
+
+
+async def add_source(
+    url: str,
+    name: Optional[str] = None,
+    country: Optional[str] = None,
+    added_by: Optional[str] = None,
+) -> dict:
+    """Register a new custom grant source URL."""
+    body: dict = {"url": url}
+    if name:
+        body["name"] = name
+    if country:
+        body["country"] = country
+    if added_by:
+        body["added_by"] = added_by
+    async with httpx.AsyncClient(base_url=settings.backend_url, timeout=15) as client:
+        resp = await client.post(
+            "/scraper/sources", json=body, headers=await _headers()
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def delete_source(source_id: int) -> dict:
+    async with httpx.AsyncClient(base_url=settings.backend_url, timeout=15) as client:
+        resp = await client.delete(
+            f"/scraper/sources/{source_id}", headers=await _headers()
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def run_source(source_id: int) -> dict:
+    """Scrape a single custom source immediately."""
+    async with httpx.AsyncClient(base_url=settings.backend_url, timeout=300) as client:
+        resp = await client.post(
+            f"/scraper/sources/{source_id}/run", headers=await _headers()
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
 # ── Subscription management ───────────────────────────────────
 
 async def subscribe(telegram_user_id: int, telegram_chat_id: int) -> dict:

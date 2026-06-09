@@ -10,9 +10,10 @@ from models.search_log import SearchLog
 from models.profile import CompanyProfile
 from models.application_document import ApplicationPackage
 from models.knowledge_entry import KnowledgeEntry
+from models.custom_source import CustomSource
 
 __all__ = [
     "Grant", "Review", "User", "GrantFeature", "NotificationSubscription",
     "GrantEmbedding", "UserPreference", "SearchLog", "CompanyProfile",
-    "ApplicationPackage", "KnowledgeEntry",
+    "ApplicationPackage", "KnowledgeEntry", "CustomSource",
 ]
