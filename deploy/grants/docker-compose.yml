@@ -33,7 +33,10 @@ services:
           - grants_backend
     volumes:
       # Shared with browser-worker so `python -m camoufox fetch` persists.
-      - camoufox_cache:/root/.cache/camoufox
+      # Mounted at /root/.cache (NOT .../camoufox) so `python -m camoufox fetch`
+      # can manage its own /root/.cache/camoufox dir; mounting the volume AT that
+      # dir makes it a mountpoint and the installer cleanup fails with EBUSY.
+      - camoufox_cache:/root/.cache
     # migrate -> seed -> serve. `alembic upgrade head` must succeed (fatal).
     # Seeding is best-effort: app.seed exists (backend/app/seed.py, verified),
     # but a seed failure must NOT block the API from coming up.
@@ -135,7 +138,10 @@ services:
     volumes:
       # Shared with backend so the camoufox browser binary/cache survives
       # one-shot worker containers and is reused by app code.
-      - camoufox_cache:/root/.cache/camoufox
+      # Mounted at /root/.cache (NOT .../camoufox) so `python -m camoufox fetch`
+      # can manage its own /root/.cache/camoufox dir; mounting the volume AT that
+      # dir makes it a mountpoint and the installer cleanup fails with EBUSY.
+      - camoufox_cache:/root/.cache
     networks:
       - ansar_shared
     depends_on:
