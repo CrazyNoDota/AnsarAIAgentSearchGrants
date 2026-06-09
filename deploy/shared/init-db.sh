@@ -65,6 +65,9 @@ psql -v ON_ERROR_STOP=1 \
     CREATE EXTENSION IF NOT EXISTS pg_trgm;
     SELECT format('GRANT ALL ON SCHEMA public TO %I', :'grants_db_user')\gexec
     SELECT format('GRANT CONNECT ON DATABASE %I TO %I', current_database(), :'n8n_db_user')\gexec
+    -- n8n runs `CREATE SCHEMA IF NOT EXISTS n8n` on every startup, which needs
+    -- CREATE on the database (CONNECT alone => "permission denied for database").
+    SELECT format('GRANT CREATE ON DATABASE %I TO %I', current_database(), :'n8n_db_user')\gexec
     SELECT format('CREATE SCHEMA IF NOT EXISTS n8n AUTHORIZATION %I', :'n8n_db_user')\gexec
     SELECT format('ALTER SCHEMA n8n OWNER TO %I', :'n8n_db_user')\gexec
     SELECT format('GRANT ALL ON SCHEMA n8n TO %I', :'n8n_db_user')\gexec
