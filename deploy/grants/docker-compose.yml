@@ -73,7 +73,11 @@ services:
   # NO host port — reached via Caddy at /n8n/ behind basic-auth. Uses the
   # shared Postgres in its own schema `n8n` inside grants_db.
   n8n:
-    image: n8nio/n8n:latest
+    # Pinned to the final stable 1.x LTS. n8n 2.x (`latest`, e.g. 2.23.4) hangs
+    # on first-boot init on this host (blocks after node-loading, before the DB
+    # migrations/server start, 0% CPU); 1.123.54 boots cleanly. Also better prod
+    # practice than a moving `latest` tag, and matches the 1.x workflow JSONs.
+    image: n8nio/n8n:1.123.54
     container_name: grants_n8n
     restart: unless-stopped
     environment:
