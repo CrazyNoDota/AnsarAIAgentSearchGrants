@@ -133,6 +133,12 @@ async def cmd_addsource(message: Message):
         if len(url_parts) > 1 and url_parts[1].strip():
             name = url_parts[1].strip()
 
+    await add_source_and_reply(message, url, name)
+
+
+async def add_source_and_reply(message: Message, url: str, name=None):
+    """Register a source via the API and reply. Shared by /addsource and the
+    natural-language router (handlers/nlu.py → handlers/chat.py)."""
     added_by = None
     if message.from_user:
         added_by = message.from_user.username or str(message.from_user.id)
