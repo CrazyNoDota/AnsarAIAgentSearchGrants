@@ -1,0 +1,81 @@
+{
+  "name": "03 — Embedding Pipeline (Hourly)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "cron-embed",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/auth/login",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {"name": "username", "value": "admin"},
+            {"name": "password", "value": "AnsarAdmin2026!"}
+          ]
+        }
+      },
+      "id": "get-token-embed",
+      "name": "Get Auth Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/embeddings/generate-pending",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {"name": "batch_size", "value": "20"}
+          ]
+        },
+        "options": {"timeout": 120000}
+      },
+      "id": "generate-pending-embed",
+      "name": "Generate Pending Embeddings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300]
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [[{"node": "Get Auth Token", "type": "main", "index": 0}]]
+    },
+    "Get Auth Token": {
+      "main": [[{"node": "Generate Pending Embeddings", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Almaty"
+  },
+  "tags": [{"name": "grant-agent"}]
+}

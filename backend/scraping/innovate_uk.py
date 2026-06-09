@@ -48,9 +48,14 @@ class InnovateUKScraper(BaseScraper):
                 )
                 description = (item.get("summary") or item.get("description") or "").strip()[:1500]
                 category = (item.get("funding_type") or item.get("type") or "R&D Grant").strip()
-                amount = item.get("amount") or item.get("value") or ""
-                if amount:
-                    description = f"Funding: {amount}\n\n{description}" if description else f"Funding: {amount}"
+                amount = str(item.get("amount") or item.get("value") or "").strip()
+                # Phase 1: keep the amount in the structured grant_amount field
+                # (the runner's budget_parser normalizes it into budget_min/max),
+                # and still surface it in the description for readability.
+                if amount and description:
+                    description = f"Funding: {amount}\n\n{description}"
+                elif amount:
+                    description = f"Funding: {amount}"
 
                 results.append(GrantData(
                     title=title,
@@ -60,6 +65,9 @@ class InnovateUKScraper(BaseScraper):
                     country="United Kingdom",
                     category=category,
                     deadline=deadline,
+                    grant_amount=amount or None,
+                    region="United Kingdom",
+                    industry=category or None,
                 ))
 
             logger.info(f"[innovate_uk] Scraped {len(results)} opportunities")
@@ -67,7 +75,37 @@ class InnovateUKScraper(BaseScraper):
             logger.warning(f"[innovate_uk] UKRI API failed ({e}), trying fallback feed")
             results = await self._scrape_fallback()
 
+        # Phase 1: if both API and Atom feed came back empty, render the UKRI
+        # funding finder through the stealth browser + adaptive LLM parser.
+        if not results:
+            logger.warning("[innovate_uk] API + Atom returned 0 — trying stealth + adaptive parser")
+            results = await self._scrape_stealth()
+
+        # Tag UK region on everything for the geo filter.
+        for g in results:
+            g.region = g.region or "United Kingdom"
         return results
+
+    async def _scrape_stealth(self) -> list["GrantData"]:
+        from scraping.adaptive_parser import AdaptiveParser
+        funding_finder = "https://www.ukri.org/opportunity/"
+        try:
+            html = await self.fetch(funding_finder, stealth=True, timeout=60)
+        except Exception as e:
+            logger.error(f"[innovate_uk] stealth fetch failed: {e}")
+            return []
+        parser = AdaptiveParser()
+        try:
+            grants = await parser.parse(
+                self.name, html,
+                default_org="Innovate UK / UKRI",
+                default_country="United Kingdom",
+                base_url="https://www.ukri.org",
+            )
+            logger.info(f"[innovate_uk] stealth+adaptive scraped {len(grants)} opportunities")
+            return grants
+        finally:
+            await parser.close()
 
     async def _scrape_fallback(self) -> list[GrantData]:
         """Fallback: parse the Innovate UK Atom/RSS competition feed."""

@@ -1,0 +1,122 @@
+{
+  "name": "04 — Daily Digest (Broadcast to All Subscribers)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24,
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "cron-digest",
+      "name": "Daily at 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/auth/login",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {"name": "username", "value": "admin"},
+            {"name": "password", "value": "AnsarAdmin2026!"}
+          ]
+        }
+      },
+      "id": "get-token-digest",
+      "name": "Get Auth Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/stats",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "=Bearer {{ $json.access_token }}"}
+          ]
+        }
+      },
+      "id": "get-stats",
+      "name": "Get Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/subscriptions/all",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "=Bearer {{ $('Get Auth Token').first().json.access_token }}"}
+          ]
+        }
+      },
+      "id": "get-subscribers",
+      "name": "Get All Subscribers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build digest message and list of chat_ids to send to\nconst stats = $('Get Stats').first().json;\nconst subscribers = $input.all();\n\nconst pending = stats.pending || 0;\nconst approved = stats.approved || 0;\nconst rejected = stats.rejected || 0;\nconst total = stats.total || 0;\n\nconst text = `📊 <b>Daily Grant Digest</b>\\n\\n📥 Pending Review: <b>${pending}</b>\\n✅ Approved: <b>${approved}</b>\\n❌ Rejected: <b>${rejected}</b>\\n📦 Total: <b>${total}</b>\\n\\n${ pending > 0 ? '👆 Open the bot to review: /pending' : '✅ No pending grants today.' }`;\n\nreturn subscribers.map(item => ({\n  json: {\n    chat_id: item.json.chat_id,\n    text: text\n  }\n}));"
+      },
+      "id": "build-messages",
+      "name": "Build Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1060, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"chat_id\": {{ $json.chat_id }}, \"text\": {{ JSON.stringify($json.text) }}, \"parse_mode\": \"HTML\" }",
+        "options": {}
+      },
+      "id": "send-to-subscriber",
+      "name": "Send to Each Subscriber",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1260, 300]
+    }
+  ],
+  "connections": {
+    "Daily at 09:00": {
+      "main": [[{"node": "Get Auth Token", "type": "main", "index": 0}]]
+    },
+    "Get Auth Token": {
+      "main": [[{"node": "Get Stats", "type": "main", "index": 0}]]
+    },
+    "Get Stats": {
+      "main": [[{"node": "Get All Subscribers", "type": "main", "index": 0}]]
+    },
+    "Get All Subscribers": {
+      "main": [[{"node": "Build Messages", "type": "main", "index": 0}]]
+    },
+    "Build Messages": {
+      "main": [[{"node": "Send to Each Subscriber", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Almaty"
+  },
+  "tags": [{"name": "grant-agent"}]
+}

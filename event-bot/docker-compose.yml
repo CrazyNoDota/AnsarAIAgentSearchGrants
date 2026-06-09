@@ -1,0 +1,10 @@
+services:
+  event-bot:
+    build: .
+    env_file: .env
+    volumes:
+      - event-bot-data:/data
+    restart: unless-stopped
+
+volumes:
+  event-bot-data:

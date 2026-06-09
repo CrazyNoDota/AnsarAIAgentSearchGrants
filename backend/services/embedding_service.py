@@ -4,10 +4,12 @@ Generates 1024-dimensional embeddings using nvidia/nv-embedqa-e5-v5
 Stores them in PostgreSQL via pgvector for semantic/RAG search
 """
 import logging
-from typing import Optional
-from openai import AsyncOpenAI
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from openai import AsyncOpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from core.config import get_settings
@@ -25,9 +27,13 @@ class EmbeddingService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self._client: Optional[AsyncOpenAI] = None
+        self._client: Optional["AsyncOpenAI"] = None
         api_key = settings.embedding_api_key
         if api_key:
+            # Lazy import keeps this service importable without `openai`
+            # installed (offline/minimal environments).
+            from openai import AsyncOpenAI
+
             self._client = AsyncOpenAI(
                 base_url=settings.nvidia_base_url,
                 api_key=api_key,

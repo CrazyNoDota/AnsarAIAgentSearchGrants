@@ -1,17 +1,13 @@
 """
-Per-user opt-in for the daily pending-grants digest.
-Writes directly to the shared DB (bot + API run in the same Vercel project).
+Subscription handler — opt-in/out for deadline reminders and daily digest.
+Uses HTTP API calls to backend (not direct DB — bot runs in separate container).
 """
 import logging
-
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
-from sqlalchemy import delete, select
 
-# These imports work because api/telegram.py prepends backend/ to sys.path
-from database.connection import AsyncSessionLocal
-from models.notification_subscription import NotificationSubscription
+import api_client
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -19,75 +15,78 @@ router = Router()
 
 @router.message(Command("subscribe"))
 async def cmd_subscribe(message: Message):
+    """/subscribe — opt in for deadline reminders and daily digest."""
     user_id = message.from_user.id
     chat_id = message.chat.id
 
-    async with AsyncSessionLocal() as db:
-        existing = await db.scalar(
-            select(NotificationSubscription).where(
-                NotificationSubscription.telegram_user_id == user_id
-            )
-        )
-        if existing:
-            existing.telegram_chat_id = chat_id
-            await db.commit()
+    try:
+        result = await api_client.subscribe(user_id, chat_id)
+        status = result.get("status", "")
+        if status == "updated":
             await message.answer(
-                "✅ Вы уже подписаны.\n\n"
-                "Ежедневный дайджест новых грантов приходит в 09:00 UTC.\n"
-                "Используйте /unsubscribe, чтобы отписаться."
+                "🔔 <b>Already subscribed</b>\n\n"
+                "You will receive:\n"
+                "  • 📅 Deadline reminders (30/14/7/1 days before)\n"
+                "  • 📊 Daily digest at 09:00 (Almaty time)\n\n"
+                "Use /unsubscribe to opt out.",
+                parse_mode="HTML",
             )
-            return
-
-        db.add(NotificationSubscription(
-            telegram_user_id=user_id,
-            telegram_chat_id=chat_id,
-        ))
-        await db.commit()
-
-    await message.answer(
-        "🔔 Подписка оформлена.\n\n"
-        "Со следующего дня вы будете получать ежедневный дайджест "
-        "новых грантов на рассмотрении в <b>09:00 UTC</b>.\n"
-        "Используйте /unsubscribe, чтобы отписаться."
-    )
+        else:
+            await message.answer(
+                "✅ <b>Subscribed successfully!</b>\n\n"
+                "You will now receive:\n"
+                "  • 📅 Deadline reminders (30/14/7/1 days before)\n"
+                "  • 📊 Daily digest at 09:00 (Almaty time)\n\n"
+                "Use /unsubscribe to opt out.",
+                parse_mode="HTML",
+            )
+    except Exception as e:
+        await message.answer(f"❌ Subscription error: {e}")
 
 
 @router.message(Command("unsubscribe"))
 async def cmd_unsubscribe(message: Message):
+    """/unsubscribe — opt out of all notifications."""
     user_id = message.from_user.id
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            delete(NotificationSubscription).where(
-                NotificationSubscription.telegram_user_id == user_id
-            )
-        )
-        await db.commit()
 
-    if result.rowcount:
-        await message.answer(
-            "🔕 Подписка отменена. Вы больше не будете получать ежедневный дайджест."
-        )
-    else:
-        await message.answer(
-            "Вы не были подписаны. Используйте /subscribe, чтобы оформить подписку."
-        )
+    try:
+        result = await api_client.unsubscribe(user_id)
+        if result.get("status") == "removed":
+            await message.answer(
+                "🔕 <b>Unsubscribed</b>\n\n"
+                "You will no longer receive reminders or digests.\n"
+                "Use /subscribe to opt back in.",
+                parse_mode="HTML",
+            )
+        else:
+            await message.answer(
+                "You were not subscribed. Use /subscribe to sign up.",
+                parse_mode="HTML",
+            )
+    except Exception as e:
+        await message.answer(f"❌ Error: {e}")
 
 
 @router.message(Command("notifications"))
 async def cmd_status(message: Message):
+    """/notifications — check subscription status."""
     user_id = message.from_user.id
-    async with AsyncSessionLocal() as db:
-        sub = await db.scalar(
-            select(NotificationSubscription).where(
-                NotificationSubscription.telegram_user_id == user_id
+
+    try:
+        result = await api_client.subscription_status(user_id)
+        if result.get("subscribed"):
+            since = result.get("since", "")[:10]
+            await message.answer(
+                f"🔔 <b>Subscribed</b> since {since}\n\n"
+                "You receive deadline reminders and daily digest.\n"
+                "Use /unsubscribe to opt out.",
+                parse_mode="HTML",
             )
-        )
-    if sub:
-        await message.answer(
-            f"🔔 Вы <b>подписаны</b> с {sub.created_at:%Y-%m-%d}.\n"
-            "Ежедневный дайджест в 09:00 UTC. Используйте /unsubscribe, чтобы отписаться."
-        )
-    else:
-        await message.answer(
-            "🔕 Вы <b>не подписаны</b>. Используйте /subscribe, чтобы оформить подписку."
-        )
+        else:
+            await message.answer(
+                "🔕 <b>Not subscribed</b>\n\n"
+                "Use /subscribe to receive deadline reminders and daily digest.",
+                parse_mode="HTML",
+            )
+    except Exception as e:
+        await message.answer(f"❌ Error checking status: {e}")

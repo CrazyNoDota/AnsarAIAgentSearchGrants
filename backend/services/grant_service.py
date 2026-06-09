@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Optional
 from sqlalchemy import select, func, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +37,13 @@ class GrantService:
         category: Optional[str] = None,
         page: int = 1,
         size: int = 20,
+        # Phase 1 structured filters
+        region: Optional[str] = None,
+        industry: Optional[str] = None,
+        deadline_before: Optional["date"] = None,
+        deadline_after: Optional["date"] = None,
+        budget_min: Optional[float] = None,
+        budget_max: Optional[float] = None,
     ) -> tuple[list[Grant], int]:
         query = select(Grant)
 
@@ -45,6 +53,20 @@ class GrantService:
             query = query.where(Grant.country.ilike(f"%{country}%"))
         if category:
             query = query.where(Grant.category.ilike(f"%{category}%"))
+        if region:
+            query = query.where(Grant.region.ilike(f"%{region}%"))
+        if industry:
+            query = query.where(Grant.industry.ilike(f"%{industry}%"))
+        if deadline_before is not None:
+            query = query.where(Grant.deadline.is_not(None), Grant.deadline <= deadline_before)
+        if deadline_after is not None:
+            query = query.where(Grant.deadline.is_not(None), Grant.deadline >= deadline_after)
+        # Budget overlap: keep grants whose [budget_min, budget_max] range
+        # intersects the requested [budget_min, budget_max] window.
+        if budget_min is not None:
+            query = query.where(or_(Grant.budget_max.is_(None), Grant.budget_max >= budget_min))
+        if budget_max is not None:
+            query = query.where(or_(Grant.budget_min.is_(None), Grant.budget_min <= budget_max))
         if search:
             query = query.where(
                 or_(

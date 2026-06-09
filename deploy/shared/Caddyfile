@@ -1,0 +1,102 @@
+# ============================================================
+# Ansar — shared Caddy reverse proxy
+# Target: /opt/ansar/shared/Caddyfile
+#
+# Caddy replaces the old HTTP-only nginx. It reverse-proxies to project
+# services over the internal `ansar_shared` network (service names:
+# grants_backend, grants_n8n, ...). n8n is NEVER exposed by a raw host port — it is reached
+# only through Caddy, behind basic-auth.
+#
+# >>> CURRENT MODE: IP / HTTP (no domain yet) <<<
+# The `:80` site below serves the grants API by IP, no TLS. n8n is mounted
+# under /n8n/ with basic-auth.
+#
+# >>> WHEN A DOMAIN ARRIVES: <<<
+# 1. Point grants.<domain> (and optionally n8n.<domain>) A-records at
+#    31.210.174.74.
+# 2. Comment out the entire `:80 { ... }` block below.
+# 3. Uncomment the domain block at the bottom and set the real hostnames.
+# 4. Set ACME_EMAIL in shared/.env.
+# 5. For n8n domain cutover, also update the n8n environment to N8N_PATH=/,
+#    N8N_SECURE_COOKIE=true, and HTTPS N8N_PUBLIC_URL / WEBHOOK_URL values.
+# 6. docker compose --env-file /opt/ansar/shared/.env -f /opt/ansar/shared/docker-compose.yml up -d caddy
+# Caddy then auto-provisions Let's Encrypt certs and redirects HTTP->HTTPS.
+# ============================================================
+
+# Global options
+{
+	# email used for ACME (Let's Encrypt) once a domain block is enabled.
+	email {$ACME_EMAIL}
+	# Uncomment for verbose debugging:
+	# debug
+}
+
+# ------------------------------------------------------------------
+# CURRENT: serve everything by IP over plain HTTP on :80
+# ------------------------------------------------------------------
+:80 {
+	# Cap request bodies at the edge (Phase 3 residual: large multipart uploads
+	# are parsed by Starlette first; reject oversized bodies here).
+	request_body {
+		max_size 25MB
+	}
+
+	# Security headers (cheap wins even over HTTP).
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# n8n admin UI — behind basic-auth, reachable only via Caddy. Use
+	# `handle` (not `handle_path`) so /n8n/ is preserved for N8N_PATH=/n8n/.
+	# The hash is a bcrypt hash supplied via N8N_BASICAUTH_HASH (shared/.env).
+	handle /n8n/* {
+		basic_auth {
+			{$N8N_BASICAUTH_USER} {$N8N_BASICAUTH_HASH}
+		}
+		reverse_proxy grants_n8n:5678
+	}
+
+	# Grants FastAPI backend (root). The app already exposes /health, /docs,
+	# /api/* etc., so proxy the whole site to it.
+	handle {
+		reverse_proxy grants_backend:8000
+	}
+}
+
+# ------------------------------------------------------------------
+# FUTURE: domain + automatic HTTPS (uncomment when a domain exists).
+# Replace grants.example.com / n8n.example.com with the real hostnames.
+# ------------------------------------------------------------------
+# grants.example.com {
+# 	request_body {
+# 		max_size 25MB
+# 	}
+# 	header {
+# 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+# 		X-Content-Type-Options "nosniff"
+# 		X-Frame-Options "SAMEORIGIN"
+# 		Referrer-Policy "strict-origin-when-cross-origin"
+# 		-Server
+# 	}
+# 	reverse_proxy grants_backend:8000
+# }
+#
+# n8n.example.com {
+# 	request_body {
+# 		max_size 25MB
+# 	}
+# 	header {
+# 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+# 		X-Content-Type-Options "nosniff"
+# 		X-Frame-Options "SAMEORIGIN"
+# 		Referrer-Policy "strict-origin-when-cross-origin"
+# 		-Server
+# 	}
+# 	basic_auth {
+# 		{$N8N_BASICAUTH_USER} {$N8N_BASICAUTH_HASH}
+# 	}
+# 	reverse_proxy grants_n8n:5678
+# }

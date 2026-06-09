@@ -1,0 +1,105 @@
+# ============================================================
+# Ansar — SHARED stack (Postgres16+pgvector, Redis7, Caddy)
+# Target: /opt/ansar/shared/docker-compose.yml on VPS 31.210.174.74
+#
+# Shared across all /opt/ansar/* projects. Data services live ONLY on the
+# internal `ansar_shared` Docker network — they DO NOT publish host ports
+# (this is the security fix vs. the old single-stack compose which exposed
+# 5432/6379 to the internet). Only Caddy publishes 80/443.
+#
+# Bring up:   docker compose --env-file /opt/ansar/shared/.env -f /opt/ansar/shared/docker-compose.yml up -d
+# Env:        copy .env.example -> .env and fill in (git-ignored, server-only)
+# ============================================================
+
+services:
+
+  # ── PostgreSQL 16 + pgvector (SHARED, one instance, DB-per-project) ──
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: ansar_db
+    restart: unless-stopped
+    environment:
+      # Bootstrap superuser / default DB. Per-project DBs + roles are created
+      # by init-db.sh (see ./init-db.sh, mounted below) on FIRST init only.
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-ansar_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      # Per-project credentials consumed by init-db.sh
+      GRANTS_DB: ${GRANTS_DB:-grants_db}
+      GRANTS_DB_USER: ${GRANTS_DB_USER:-grants_user}
+      GRANTS_DB_PASSWORD: ${GRANTS_DB_PASSWORD:?GRANTS_DB_PASSWORD is required}
+      N8N_DB_USER: ${N8N_DB_USER:-n8n_user}
+      N8N_DB_PASSWORD: ${N8N_DB_PASSWORD:?N8N_DB_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # init-db.sh runs ONLY on a fresh data volume (first boot). It creates the
+      # per-project database + role and enables the vector/pg_trgm extensions.
+      - ./init-db.sh:/docker-entrypoint-initdb.d/01-init-db.sh:ro
+    # NO host port mapping — Postgres is reachable only via the ansar_shared
+    # network as host `db`. (Old compose published 5432 to the internet.)
+    networks:
+      - ansar_shared
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ansar_admin} -d ${POSTGRES_DB:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── Redis 7 (SHARED cache + task queue) ──────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ansar_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    # NO host port mapping — reachable only as host `redis` on ansar_shared.
+    networks:
+      - ansar_shared
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Caddy reverse proxy (SHARED) ─────────────────────────────────────
+  # The ONLY service exposed to the host. Routes to project backends/n8n on
+  # the shared network. Defaults to IP/HTTP now; flip to a domain block in the
+  # Caddyfile for automatic Let's Encrypt TLS when a domain arrives.
+  caddy:
+    image: caddy:2-alpine
+    container_name: ansar_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 (no-op until a domain/TLS block is enabled)
+    environment:
+      # Used by the Caddyfile domain block when you enable TLS later.
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+      # basic-auth for n8n (bcrypt hash). Generate with:
+      #   docker run --rm caddy:2-alpine caddy hash-password --plaintext 'yourpass'
+      N8N_BASICAUTH_USER: ${N8N_BASICAUTH_USER:-admin}
+      N8N_BASICAUTH_HASH: ${N8N_BASICAUTH_HASH:?N8N_BASICAUTH_HASH is required}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data    # persists ACME certs/keys across restarts
+      - caddy_config:/config
+    networks:
+      - ansar_shared
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+
+# Shared external-style network created by provision.sh:
+#   docker network create ansar_shared
+# Project stacks (grants, project2, ...) join it as `external: true`.
+networks:
+  ansar_shared:
+    name: ansar_shared
+    external: true

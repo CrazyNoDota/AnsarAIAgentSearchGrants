@@ -1,9 +1,17 @@
 version: "3.9"
 
+# ============================================================
+# AI Grant Discovery & Recommendation System
+# VPS Deployment — Docker Compose
+# Deploy: docker compose up -d
+# ============================================================
+
 services:
-  # ── PostgreSQL Database ──────────────────────────────────────
+
+  # ── PostgreSQL 16 + pgvector ──────────────────────────────
+  # pgvector enables semantic/vector search for RAG architecture
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: grants_db
     restart: unless-stopped
     environment:
@@ -12,15 +20,32 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init.sql
     ports:
       - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
+      retries: 10
+
+  # ── Redis 7 (caching + task queue) ───────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: grants_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
       retries: 5
 
-  # ── FastAPI Backend ──────────────────────────────────────────
+  # ── FastAPI Backend ──────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -30,20 +55,26 @@ services:
     env_file: .env
     environment:
       POSTGRES_HOST: db
-      RUN_SCHEDULER: "1"
+      REDIS_URL: redis://redis:6379
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
+      redis:
+        condition: service_healthy
     command: >
-      sh -c "alembic upgrade head &&
-             python -m app.seed &&
-             uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+      sh -c "
+        echo 'Running database migrations...' &&
+        alembic upgrade head &&
+        echo 'Seeding admin user...' &&
+        python -m app.seed &&
+        echo 'Starting API server...' &&
+        uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
+      "
 
-  # ── Telegram Bot ─────────────────────────────────────────────
+  # ── Telegram Bot (long-polling) ───────────────────────────
+  # Runs in polling mode — no webhook needed on VPS
   bot:
     build:
       context: ./bot
@@ -55,21 +86,64 @@ services:
       BACKEND_URL: http://backend:8000
     depends_on:
       - backend
-    volumes:
-      - ./bot:/app
 
-  # ── Next.js Frontend ─────────────────────────────────────────
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: grants_frontend
+  # ── n8n Workflow Automation ───────────────────────────────
+  # Visual workflow editor: http://<VPS_IP>:5678
+  # Handles: daily search, embedding pipeline, deadline reminders, digest
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: grants_n8n
     restart: unless-stopped
-    env_file: .env
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-n8n_admin_2026}
+      - WEBHOOK_URL=http://${VPS_IP:-localhost}:5678/
+      - GENERIC_TIMEZONE=Asia/Almaty
+      # Use same PostgreSQL (separate schema "n8n")
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=db
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_POSTGRESDB_SCHEMA=n8n
+      - N8N_LOG_LEVEL=info
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=none
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - N8N_METRICS=false
+      - N8N_SECURE_COOKIE=false
+      # Make Telegram token available to n8n workflows via $env.TELEGRAM_BOT_TOKEN
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     ports:
-      - "3000:3000"
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── nginx Reverse Proxy ───────────────────────────────────
+  # Routes: /api/ → backend:8000, /docs → swagger
+  # Access: http://<VPS_IP>/api/
+  nginx:
+    image: nginx:alpine
+    container_name: grants_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   postgres_data:
+  redis_data:
+  n8n_data:

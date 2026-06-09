@@ -1,0 +1,150 @@
+# ============================================================
+# Ansar GRANTS project stack (backend, bot, n8n, optional browser-worker)
+# Target: /opt/ansar/grants/  (the repo is checked out here on the VPS)
+#
+# Run from the repo root so the relative build contexts resolve:
+#   docker compose --env-file deploy/grants/.env -f deploy/grants/docker-compose.yml up -d --build
+#
+# Depends on the SHARED stack (Postgres/Redis/Caddy) being up first and the
+# external `ansar_shared` network existing. Data services are reached by their
+# shared-network hostnames: db (postgres), redis. n8n is reached ONLY via
+# Caddy (/n8n/) — it publishes NO host port.
+# ============================================================
+
+services:
+
+  # ── FastAPI Backend ──────────────────────────────────────────────────
+  backend:
+    build:
+      # repo-root-relative (compose file is two levels deep under deploy/grants)
+      context: ../../backend
+      dockerfile: Dockerfile
+    image: ansar/grants-backend:latest
+    container_name: grants_backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db          # shared Postgres on ansar_shared
+      REDIS_URL: redis://redis:6379
+    # NO host port — reached through Caddy (reverse_proxy grants_backend:8000).
+    networks:
+      ansar_shared:
+        aliases:
+          - grants_backend
+    volumes:
+      # Shared with browser-worker so `python -m camoufox fetch` persists.
+      - camoufox_cache:/root/.cache/camoufox
+    # migrate -> seed -> serve. `alembic upgrade head` must succeed (fatal).
+    # Seeding is best-effort: app.seed exists (backend/app/seed.py, verified),
+    # but a seed failure must NOT block the API from coming up.
+    command: >
+      sh -c "
+        echo 'Running database migrations...' &&
+        alembic upgrade head &&
+        echo 'Seeding admin user (best-effort)...' &&
+        (python -m app.seed || echo 'WARN: seed step failed; continuing') &&
+        echo 'Starting API server...' &&
+        uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+
+  # ── Telegram Bot (long-polling) ──────────────────────────────────────
+  bot:
+    build:
+      context: ../../bot
+      dockerfile: Dockerfile
+    image: ansar/grants-bot:latest
+    container_name: grants_bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      BACKEND_URL: http://backend:8000
+    networks:
+      - ansar_shared
+    depends_on:
+      - backend
+
+  # ── n8n Workflow Automation ──────────────────────────────────────────
+  # NO host port — reached via Caddy at /n8n/ behind basic-auth. Uses the
+  # shared Postgres in its own schema `n8n` inside grants_db.
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: grants_n8n
+    restart: unless-stopped
+    environment:
+      # n8n's own login (in addition to Caddy basic-auth in front of it).
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:?set N8N_USER in .env}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:?set N8N_PASSWORD in .env}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:?set N8N_ENCRYPTION_KEY in .env}
+      # Served under /n8n/ by Caddy. Set N8N_PUBLIC_URL once a domain exists.
+      - N8N_PATH=/n8n/
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - WEBHOOK_URL=${N8N_PUBLIC_URL:-http://31.210.174.74/n8n/}
+      - N8N_PROXY_HOPS=1
+      - GENERIC_TIMEZONE=Asia/Almaty
+      # Same shared Postgres, dedicated n8n role + schema inside grants_db.
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=db
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:?set POSTGRES_DB in .env}
+      - DB_POSTGRESDB_USER=${N8N_DB_USER:?set N8N_DB_USER in .env}
+      - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD:?set N8N_DB_PASSWORD in .env}
+      - DB_POSTGRESDB_SCHEMA=n8n
+      - N8N_LOG_LEVEL=info
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=none
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - N8N_METRICS=false
+      # Behind Caddy TLS-termination; cookie still works over HTTP-by-IP now.
+      - N8N_SECURE_COOKIE=false
+      # Telegram token available to workflows via $env.TELEGRAM_BOT_TOKEN
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - ansar_shared
+
+  # ── Browser worker (camoufox/Playwright) — ON DEMAND only ────────────
+  # NOT restart: unless-stopped (4 GB RAM box). Started only when needed:
+  #   docker compose --env-file deploy/grants/.env -f deploy/grants/docker-compose.yml --profile browser run --rm browser-worker
+  # Hard memory cap so a runaway headless browser cannot OOM the host.
+  browser-worker:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    image: ansar/grants-backend:latest
+    container_name: grants_browser_worker
+    profiles: ["browser"]
+    restart: "no"
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379
+    mem_limit: 1.5g
+    mem_reservation: 512m
+    volumes:
+      # Shared with backend so the camoufox browser binary/cache survives
+      # one-shot worker containers and is reused by app code.
+      - camoufox_cache:/root/.cache/camoufox
+    networks:
+      - ansar_shared
+    depends_on:
+      - backend
+    # Override with the actual scrape entrypoint at run time, e.g.:
+    #   ... run --rm browser-worker python -m scraping.run_queue
+    command: ["python", "-c", "print('browser-worker is on-demand; pass a command')"]
+
+volumes:
+  n8n_data:
+  camoufox_cache:
+
+networks:
+  ansar_shared:
+    name: ansar_shared
+    external: true

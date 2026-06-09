@@ -1,0 +1,134 @@
+{
+  "name": "01 — Daily Grant Discovery",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24,
+              "triggerAtHour": 2,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "cron-daily-search",
+      "name": "Daily at 02:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/auth/login",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {"name": "username", "value": "admin"},
+            {"name": "password", "value": "AnsarAdmin2026!"}
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-token",
+      "name": "Get Auth Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/scraper/run",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "run-scrapers",
+      "name": "Run All Scrapers + AI Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/embeddings/generate-pending",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Get Auth Token').first().json.access_token }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {"name": "batch_size", "value": "50"}
+          ]
+        },
+        "options": {"timeout": 180000}
+      },
+      "id": "generate-embeddings",
+      "name": "Generate Embeddings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/grants/learning/update-scores",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Get Auth Token').first().json.access_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "update-scores",
+      "name": "Update AI Scores",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1060, 300]
+    }
+  ],
+  "connections": {
+    "Daily at 02:00": {
+      "main": [[{"node": "Get Auth Token", "type": "main", "index": 0}]]
+    },
+    "Get Auth Token": {
+      "main": [[{"node": "Run All Scrapers + AI Agent", "type": "main", "index": 0}]]
+    },
+    "Run All Scrapers + AI Agent": {
+      "main": [[{"node": "Generate Embeddings", "type": "main", "index": 0}]]
+    },
+    "Generate Embeddings": {
+      "main": [[{"node": "Update AI Scores", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Almaty"
+  },
+  "tags": [{"name": "grant-agent"}]
+}

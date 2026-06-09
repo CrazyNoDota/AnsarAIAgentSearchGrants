@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
     telegram_allowed_users: str = ""
+    reminder_cron_secret: str = ""
 
     # NVIDIA AI API (LLM)
     nvidia_api_key: str = ""
@@ -39,6 +40,24 @@ class Settings(BaseSettings):
 
     # NVIDIA Embeddings — separate key. Falls back to nvidia_api_key if empty.
     nvidia_embedding_api_key: str = ""
+
+    # NVIDIA NIM — StepFun multimodal model (Phase 3). Vision-capable; reads
+    # scanned/PDF grant calls + user docs via image_url data-URLs (OCR-style).
+    # Separate key/model/base_url; key falls back to nvidia_api_key if empty.
+    nvidia_step_api_key: str = ""
+    nvidia_step_model: str = "stepfun-ai/step-3.7-flash"
+    nvidia_step_base_url: str = "https://integrate.api.nvidia.com/v1"
+
+    # Email / SMTP notifications (Phase 4). All optional with safe defaults —
+    # email degrades gracefully (log + skip) when unconfigured, mirroring how
+    # Telegram checks `telegram_bot_token`. Credentials load from .env ONLY.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True  # STARTTLS (port 587). Set false for plain/SSL.
+    smtp_use_ssl: bool = False  # implicit SSL (port 465); mutually exclusive w/ TLS
+    email_from: str = ""  # sender address; falls back to smtp_user if empty
 
     # OpenAI (fallback)
     openai_api_key: str = ""
@@ -80,6 +99,25 @@ class Settings(BaseSettings):
     def embedding_api_key(self) -> str:
         """Dedicated embedding key, falling back to the main NVIDIA key."""
         return self.nvidia_embedding_api_key or self.nvidia_api_key
+
+    @property
+    def step_api_key(self) -> str:
+        """Dedicated StepFun multimodal key, falling back to the main NVIDIA key."""
+        return self.nvidia_step_api_key or self.nvidia_api_key
+
+    @property
+    def use_step(self) -> bool:
+        return bool(self.step_api_key)
+
+    @property
+    def email_sender(self) -> str:
+        """Effective From address — explicit `email_from` or the SMTP user."""
+        return self.email_from or self.smtp_user
+
+    @property
+    def use_email(self) -> bool:
+        """Email is usable only when a host AND a sender address are configured."""
+        return bool(self.smtp_host and self.email_sender)
 
     @property
     def use_openai(self) -> bool:

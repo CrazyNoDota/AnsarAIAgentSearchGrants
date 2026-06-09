@@ -1,0 +1,88 @@
+# ============================================================
+# Ansar GRANTS — deploy to VPS via SSH (Variant B)
+#
+# On push to main (path-filtered to this project), SSH to the VPS as the deploy
+# user, `git pull` the repo checked out at /opt/ansar/grants, and bring the
+# stack up with the project compose file. Secrets live in GitHub Actions
+# Secrets — NEVER in the repo.
+#
+# Required GitHub repo Secrets (Settings -> Secrets and variables -> Actions):
+#   VPS_HOST     -> 31.210.174.74
+#   VPS_USER     -> deploy
+#   VPS_SSH_KEY  -> the PRIVATE SSH key whose public half is in the deploy
+#                   user's authorized_keys (ed25519 recommended)
+#   VPS_SSH_PORT -> 22  (optional; defaults to 22)
+#   VPS_SSH_KNOWN_HOSTS -> REQUIRED pinned known_hosts line(s) for the VPS.
+#                   The workflow fails if absent; no ssh-keyscan TOFU fallback.
+#
+# The workflow also refreshes deploy/shared/{docker-compose.yml,Caddyfile,
+# init-db.sh} into /opt/ansar/shared and runs shared compose up -d. The server's
+# /opt/ansar/shared/.env is intentionally NOT overwritten.
+# ============================================================
+name: Deploy grants to VPS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "bot/**"
+      - "deploy/grants/**"
+      - "deploy/shared/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch: {}   # manual trigger from the Actions tab
+
+concurrency:
+  group: deploy-grants
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          if [ -z "${VPS_SSH_KNOWN_HOSTS:-}" ]; then
+            echo "ERROR: VPS_SSH_KNOWN_HOSTS is required. Add pinned known_hosts line(s) for ${VPS_HOST}:${VPS_PORT}; ssh-keyscan fallback is disabled." >&2
+            exit 1
+          fi
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_deploy -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" bash -se <<'REMOTE'
+            set -euo pipefail
+            cd /opt/ansar/grants
+            echo "== pulling latest main =="
+            git fetch --prune origin
+            git checkout main
+            git reset --hard origin/main
+            echo "== refreshing shared stack files =="
+            install -d -m 755 /opt/ansar/shared
+            install -m 644 deploy/shared/docker-compose.yml /opt/ansar/shared/docker-compose.yml
+            install -m 644 deploy/shared/Caddyfile /opt/ansar/shared/Caddyfile
+            install -m 755 deploy/shared/init-db.sh /opt/ansar/shared/init-db.sh
+            echo "== applying shared stack changes =="
+            docker compose --env-file /opt/ansar/shared/.env -f /opt/ansar/shared/docker-compose.yml up -d
+            echo "== building + starting grants stack =="
+            docker compose --env-file /opt/ansar/grants/deploy/grants/.env -f deploy/grants/docker-compose.yml up -d --build
+            echo "== pruning dangling images =="
+            docker image prune -f
+            echo "== status =="
+            docker compose --env-file /opt/ansar/grants/deploy/grants/.env -f deploy/grants/docker-compose.yml ps
+          REMOTE

@@ -2,6 +2,9 @@
 .env
 *.env
 
+# Phase 1: adaptive parser strategy cache (file fallback when Redis is down)
+backend/scraping/_parser_cache/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -38,3 +41,15 @@ Thumbs.db
 *.log
 
 .vercel
+
+# Legacy single-stack deploy scripts — contain hardcoded root credentials for an
+# old server (2.134.15.37). NEVER commit to this PUBLIC repo. Superseded by
+# deploy/ + .github/workflows/deploy.yml (key-based, secrets in GH Actions).
+deploy_to_vps.py
+vps_*.py
+
+# Accidental temp dumps that landed in the repo root
+C*AppDataLocalTemp*
+*docx_dump.txt
+tok.json
+token.txt

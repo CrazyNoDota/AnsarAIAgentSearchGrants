@@ -1,3 +1,10 @@
+"""
+Search and recommendation handlers.
+- /search — hybrid search (keyword + semantic)
+- /recommend — full RAG pipeline with NVIDIA LLM grounded response
+- /summarize — AI summary of specific grant
+- /delete — remove a grant
+"""
 import httpx
 from aiogram import Router
 from aiogram.filters import Command
@@ -10,12 +17,6 @@ router = Router()
 
 
 def _format_error(e: Exception) -> str:
-    """Surface enough detail that users (and we) can diagnose failures.
-
-    - httpx.HTTPStatusError: include the backend-reported `detail` if any.
-    - Other httpx errors (ReadTimeout/ConnectError): can have empty str(e),
-      so fall back to the class name.
-    """
     if isinstance(e, httpx.HTTPStatusError):
         try:
             payload = e.response.json()
@@ -31,102 +32,117 @@ def _format_error(e: Exception) -> str:
 
 @router.message(Command("search"))
 async def cmd_search(message: Message):
-    """/search <query> — поиск грантов по ключевым словам."""
+    """/search <query> — hybrid keyword + semantic search."""
     parts = message.text.split(maxsplit=1) if message.text else []
     if len(parts) < 2 or not parts[1].strip():
         await message.answer(
-            "🔍 <b>Поиск грантов</b>\n\n"
-            "Использование: <code>/search &lt;ваш запрос&gt;</code>\n\n"
-            "Примеры:\n"
-            "  <code>/search AI стартап</code>\n"
-            "  <code>/search образование Европа</code>",
+            "🔍 <b>Search Grants</b>\n\n"
+            "Usage: <code>/search &lt;your query&gt;</code>\n\n"
+            "Examples:\n"
+            "  <code>/search AI startup grants</code>\n"
+            "  <code>/search university Europe funding</code>\n"
+            "  <code>/search no equity accelerator</code>\n\n"
+            "<i>Uses hybrid search: keyword + AI semantic matching.</i>",
             parse_mode="HTML",
         )
         return
 
     query = parts[1].strip()
-    await message.answer(f"🔍 Ищу: <b>{query}</b>...", parse_mode="HTML")
+    await message.answer(f"🔍 Searching: <b>{query}</b>...", parse_mode="HTML")
 
     try:
-        data = await api_client.search_grants(query, page=1, size=5)
-        items = data.get("items", [])
-        total = data.get("total", 0)
+        data = await api_client.hybrid_search(query, limit=5)
+        items = data.get("results", [])
 
         if not items:
             await message.answer(
-                f"Гранты не найдены по запросу <b>{query}</b>.", parse_mode="HTML"
-            )
-            return
-
-        await message.answer(
-            f"Найдено <b>{total}</b> результат(ов) по запросу <b>{query}</b>:",
-            parse_mode="HTML",
-        )
-        for i, grant in enumerate(items):
-            text = format_grant(grant, index=i + 1, total=total)
-            await message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
-
-    except Exception as e:
-        await message.answer(f"❌ Ошибка поиска: {_format_error(e)}")
-
-
-@router.message(Command("recommend"))
-async def cmd_recommend(message: Message):
-    """/recommend <query> — AI-рекомендации (Qwen3-480B)."""
-    parts = message.text.split(maxsplit=1) if message.text else []
-    if len(parts) < 2 or not parts[1].strip():
-        await message.answer(
-            "🤖 <b>AI-рекомендации грантов</b>\n"
-            "<i>На базе Qwen3-480B через NVIDIA AI</i>\n\n"
-            "Использование: <code>/recommend &lt;описание&gt;</code>\n\n"
-            "Примеры:\n"
-            "  <code>/recommend гранты для стартапов в образовании</code>\n"
-            "  <code>/recommend научное финансирование университеты Европа</code>\n"
-            "  <code>/recommend зелёная энергетика устойчивое развитие НКО</code>",
-            parse_mode="HTML",
-        )
-        return
-
-    query = parts[1].strip()
-    await message.answer(
-        f"🤖 <b>Qwen3-480B</b> ищет рекомендации по запросу:\n<i>{query}</i>\n\n"
-        f"<i>Это может занять до минуты — модель анализирует все гранты в базе.</i>",
-        parse_mode="HTML",
-    )
-
-    try:
-        grants = await api_client.get_recommendations(query, limit=5)
-
-        if not grants:
-            await message.answer(
-                "Подходящие гранты не найдены. Попробуйте другой запрос.\n"
-                "<i>Совет: одобрите несколько грантов, чтобы AI лучше понимал ваши предпочтения!</i>",
+                f"No grants found for <b>{query}</b>.\n"
+                f"<i>Try /recommend for AI-powered suggestions.</i>",
                 parse_mode="HTML",
             )
             return
 
         await message.answer(
-            f"🎯 Топ-<b>{len(grants)}</b> рекомендаций от AI:",
+            f"Found <b>{len(items)}</b> result(s) for: <b>{query}</b>",
             parse_mode="HTML",
         )
+        for i, grant in enumerate(items):
+            text = format_grant(grant, index=i + 1, total=len(items))
+            await message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
+
+    except Exception as e:
+        await message.answer(f"❌ Search error: {_format_error(e)}")
+
+
+@router.message(Command("recommend"))
+async def cmd_recommend(message: Message):
+    """/recommend <query> — RAG-powered AI recommendations (anti-hallucination)."""
+    parts = message.text.split(maxsplit=1) if message.text else []
+    if len(parts) < 2 or not parts[1].strip():
+        await message.answer(
+            "🤖 <b>AI Grant Recommendations</b>\n"
+            "<i>Powered by NVIDIA Qwen3 + RAG (verified database only)</i>\n\n"
+            "Usage: <code>/recommend &lt;description&gt;</code>\n\n"
+            "Examples:\n"
+            "  <code>/recommend grants for AI startups in Central Asia</code>\n"
+            "  <code>/recommend university research funding Europe no equity</code>\n"
+            "  <code>/recommend NGO environmental impact programs</code>\n\n"
+            "<i>The AI only answers from our verified grant database — never invents information.</i>",
+            parse_mode="HTML",
+        )
+        return
+
+    query = parts[1].strip()
+    user_id = str(message.from_user.id) if message.from_user else None
+
+    await message.answer(
+        f"🤖 <b>AI analyzing query:</b>\n<i>{query}</i>\n\n"
+        f"<i>Searching verified grant database... (up to 30s)</i>",
+        parse_mode="HTML",
+    )
+
+    try:
+        result = await api_client.rag_chat(query, limit=5, user_id=user_id)
+
+        grants = result.get("grants", [])
+        response_text = result.get("response", "")
+
+        if not grants:
+            await message.answer(
+                "Verified information was not found in our database for this query.\n\n"
+                "<i>Try a different query or wait for the next scraping cycle to add more grants.</i>",
+                parse_mode="HTML",
+            )
+            return
+
+        # Send the grounded AI response first
+        if response_text:
+            await message.answer(
+                f"🤖 <b>AI Analysis:</b>\n\n{response_text}",
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
+
+        # Then send individual grant cards
+        await message.answer(f"📋 <b>Verified grants from database ({len(grants)}):</b>", parse_mode="HTML")
         for i, grant in enumerate(grants):
             text = format_grant(grant, index=i + 1, total=len(grants))
             await message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
 
     except Exception as e:
-        await message.answer(f"❌ Ошибка рекомендации: {_format_error(e)}")
+        await message.answer(f"❌ Recommendation error: {_format_error(e)}")
 
 
 @router.message(Command("delete"))
 async def cmd_delete(message: Message):
-    """/delete <grant_id> — удалить грант навсегда."""
+    """/delete <grant_id> — permanently remove a grant."""
     parts = message.text.split(maxsplit=1) if message.text else []
     if len(parts) < 2 or not parts[1].strip().isdigit():
         await message.answer(
-            "🗑 <b>Удаление гранта</b>\n\n"
-            "Использование: <code>/delete &lt;id_гранта&gt;</code>\n\n"
-            "Пример: <code>/delete 42</code>\n\n"
-            "ID гранта указан внизу каждого сообщения о гранте.",
+            "🗑 <b>Delete Grant</b>\n\n"
+            "Usage: <code>/delete &lt;grant_id&gt;</code>\n"
+            "Example: <code>/delete 42</code>\n\n"
+            "Grant ID is shown at the bottom of each grant card.",
             parse_mode="HTML",
         )
         return
@@ -134,41 +150,35 @@ async def cmd_delete(message: Message):
     grant_id = int(parts[1].strip())
     try:
         await api_client.delete_grant(grant_id)
-        await message.answer(
-            f"🗑 Грант #{grant_id} удалён.",
-            parse_mode="HTML",
-        )
+        await message.answer(f"🗑 Grant #{grant_id} deleted.", parse_mode="HTML")
     except Exception as e:
-        await message.answer(f"❌ Не удалось удалить: {_format_error(e)}")
+        await message.answer(f"❌ Delete failed: {_format_error(e)}")
 
 
 @router.message(Command("summarize"))
 async def cmd_summarize(message: Message):
-    """/summarize <grant_id> — AI-резюме конкретного гранта."""
+    """/summarize <grant_id> — AI-generated summary (NVIDIA LLM)."""
     parts = message.text.split(maxsplit=1) if message.text else []
     if len(parts) < 2 or not parts[1].strip().isdigit():
         await message.answer(
-            "📝 <b>AI-резюме гранта</b>\n\n"
-            "Использование: <code>/summarize &lt;id_гранта&gt;</code>\n\n"
-            "Пример: <code>/summarize 42</code>\n\n"
-            "ID гранта указан внизу каждого сообщения о гранте.",
+            "📝 <b>AI Grant Summary</b>\n\n"
+            "Usage: <code>/summarize &lt;grant_id&gt;</code>\n"
+            "Example: <code>/summarize 42</code>",
             parse_mode="HTML",
         )
         return
 
     grant_id = int(parts[1].strip())
-    await message.answer(
-        f"📝 Генерирую AI-резюме для гранта #{grant_id}...", parse_mode="HTML"
-    )
+    await message.answer(f"📝 Generating AI summary for grant #{grant_id}...", parse_mode="HTML")
 
     try:
         result = await api_client.summarize_grant(grant_id)
-        summary = result.get("summary", "Резюме недоступно.")
+        summary = result.get("summary", "Summary not available.")
         await message.answer(
-            f"📝 <b>AI-резюме — Грант #{grant_id}</b>\n\n"
+            f"📝 <b>AI Summary — Grant #{grant_id}</b>\n\n"
             f"{summary}\n\n"
-            f"<i>Создано моделью {result.get('model', 'AI')}</i>",
+            f"<i>Generated by {result.get('model', 'AI')} | Source: {result.get('source', 'verified_db')}</i>",
             parse_mode="HTML",
         )
     except Exception as e:
-        await message.answer(f"❌ Ошибка резюме: {_format_error(e)}")
+        await message.answer(f"❌ Summary error: {_format_error(e)}")

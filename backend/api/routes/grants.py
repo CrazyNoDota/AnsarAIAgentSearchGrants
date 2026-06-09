@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,12 @@ async def list_grants(
     search: Optional[str] = Query(None, description="Full-text search"),
     country: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
+    region: Optional[str] = Query(None, description="Geo region bucket: Europe|United Kingdom|Global..."),
+    industry: Optional[str] = Query(None, description="Target industry/sector"),
+    deadline_before: Optional[date] = Query(None, description="Deadline on/before this date"),
+    deadline_after: Optional[date] = Query(None, description="Deadline on/after this date"),
+    budget_min: Optional[float] = Query(None, description="Minimum budget overlap"),
+    budget_max: Optional[float] = Query(None, description="Maximum budget overlap"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -28,6 +35,12 @@ async def list_grants(
         search=search,
         country=country,
         category=category,
+        region=region,
+        industry=industry,
+        deadline_before=deadline_before,
+        deadline_after=deadline_after,
+        budget_min=budget_min,
+        budget_max=budget_max,
         page=page,
         size=size,
     )
