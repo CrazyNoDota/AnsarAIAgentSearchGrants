@@ -29,14 +29,14 @@ async def cmd_freeform(message: Message):
 
     user_id = str(message.from_user.id) if message.from_user else None
     thinking = await message.answer(
-        "🤖 Searching verified grant database…", parse_mode="HTML"
+        "🤖 Ищу в проверенной базе грантов…", parse_mode="HTML"
     )
 
     try:
         result = await api_client.rag_chat(text, limit=5, user_id=user_id)
     except Exception as e:
         logger.exception("RAG fallback failed")
-        await thinking.edit_text(f"❌ Search error: {e}")
+        await thinking.edit_text(f"❌ Ошибка поиска: {e}")
         return
 
     grants = result.get("grants") or []
@@ -44,8 +44,8 @@ async def cmd_freeform(message: Message):
 
     if not grants and not response_text:
         await thinking.edit_text(
-            "I couldn't find anything in the verified database for that.\n"
-            "Try a different query, or use <code>/search</code>.",
+            "По этому запросу в проверенной базе ничего не нашлось.\n"
+            "Попробуйте другой запрос или команду <code>/search</code>.",
             parse_mode="HTML",
         )
         return
@@ -54,14 +54,14 @@ async def cmd_freeform(message: Message):
 
     if response_text:
         await message.answer(
-            f"🤖 <b>AI Analysis:</b>\n\n{response_text}",
+            f"🤖 <b>Анализ ИИ:</b>\n\n{response_text}",
             parse_mode="HTML",
             disable_web_page_preview=True,
         )
 
     if grants:
         await message.answer(
-            f"📋 <b>Verified grants ({len(grants)}):</b>", parse_mode="HTML"
+            f"📋 <b>Проверенные гранты ({len(grants)}):</b>", parse_mode="HTML"
         )
         for i, grant in enumerate(grants):
             await message.answer(

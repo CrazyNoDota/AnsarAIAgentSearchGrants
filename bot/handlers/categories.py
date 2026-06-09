@@ -35,11 +35,11 @@ async def send_category_list(message: Message) -> None:
     try:
         cats = await api_client.list_categories()
     except Exception as e:
-        await message.answer(f"❌ Failed to load categories: {e}")
+        await message.answer(f"❌ Не удалось загрузить категории: {e}")
         return
 
     if not cats:
-        await message.answer("No categories found yet. Run a scrape first.")
+        await message.answer("Категорий пока нет. Сначала запустите сбор.")
         return
 
     rows = []
@@ -58,7 +58,7 @@ async def send_category_list(message: Message) -> None:
 
     kb = InlineKeyboardMarkup(inline_keyboard=rows)
     await message.answer(
-        "🏷 <b>Filter by Category</b>\n\nPick a direction:",
+        "🏷 <b>Фильтр по категориям</b>\n\nВыберите направление:",
         parse_mode="HTML",
         reply_markup=kb,
     )
@@ -67,7 +67,7 @@ async def send_category_list(message: Message) -> None:
 async def _send_category_page(message: Message, cat_hash: str, page: int) -> None:
     category = _CATEGORY_MAP.get(cat_hash)
     if not category:
-        await message.answer("Category expired — open the menu again.")
+        await message.answer("Категория устарела — откройте меню заново.")
         return
 
     try:
@@ -75,18 +75,18 @@ async def _send_category_page(message: Message, cat_hash: str, page: int) -> Non
             status="approved", page=page, size=PAGE_SIZE, category=category
         )
     except Exception as e:
-        await message.answer(f"❌ Failed to load grants: {e}")
+        await message.answer(f"❌ Не удалось загрузить гранты: {e}")
         return
 
     items = data.get("items", [])
     total = data.get("total", 0)
 
     if not items:
-        await message.answer(f"No grants in <b>{category}</b>.", parse_mode="HTML")
+        await message.answer(f"В категории <b>{category}</b> грантов нет.", parse_mode="HTML")
         return
 
     await message.answer(
-        f"🏷 <b>{category}</b> — {total} grant(s)", parse_mode="HTML"
+        f"🏷 <b>{category}</b> — грантов: {total}", parse_mode="HTML"
     )
 
     for i, grant in enumerate(items):
@@ -103,18 +103,18 @@ async def _send_category_page(message: Message, cat_hash: str, page: int) -> Non
         row = []
         if page > 1:
             row.append(InlineKeyboardButton(
-                text="⬅ Prev", callback_data=f"cat:{cat_hash}:{page - 1}"
+                text="⬅ Назад", callback_data=f"cat:{cat_hash}:{page - 1}"
             ))
         if page < total_pages:
             row.append(InlineKeyboardButton(
-                text="Next ➡", callback_data=f"cat:{cat_hash}:{page + 1}"
+                text="Далее ➡", callback_data=f"cat:{cat_hash}:{page + 1}"
             ))
         rows = [row] if row else []
         rows.append([InlineKeyboardButton(
-            text=f"📄 Page {page}/{total_pages}", callback_data="noop"
+            text=f"📄 Стр. {page}/{total_pages}", callback_data="noop"
         )])
         await message.answer(
-            f"Showing {min(page * PAGE_SIZE, total)}/{total} grants.",
+            f"Показано {min(page * PAGE_SIZE, total)}/{total} грантов.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
         )
 

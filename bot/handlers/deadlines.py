@@ -24,28 +24,28 @@ async def send_deadlines(message: Message, days: int = 30):
         data = await api_client.get_deadlines(days=days)
         items = data.get("items", [])
     except Exception as e:
-        await message.answer(f"❌ Failed to load deadlines: {e}")
+        await message.answer(f"❌ Не удалось загрузить дедлайны: {e}")
         return
 
     if not items:
         await message.answer(
-            f"📅 <b>No upcoming deadlines</b>\n\n"
-            f"No approved grants with deadlines in the next {days} days.",
+            f"📅 <b>Ближайших дедлайнов нет</b>\n\n"
+            f"Нет одобренных грантов с дедлайном в ближайшие {days} дн.",
             parse_mode="HTML",
         )
         return
 
-    lines = [f"⏰ <b>Upcoming Deadlines ({days} days)</b>\n"]
+    lines = [f"⏰ <b>Ближайшие дедлайны ({days} дн.)</b>\n"]
     for item in items:
         emoji = URGENCY_EMOJI.get(item.get("urgency", "normal"), "📅")
         days_left = item.get("days_left", 0)
-        title = item.get("title", "Unknown")[:60]
+        title = item.get("title", "Без названия")[:60]
         deadline = item.get("deadline", "?")
         gid = item.get("id")
 
         lines.append(
             f"{emoji} <b>{title}</b>\n"
-            f"   📅 {deadline} — {days_left} day(s) left\n"
+            f"   📅 {deadline} — осталось {days_left} дн.\n"
             f"   🆔 ID: <code>{gid}</code>\n"
         )
 

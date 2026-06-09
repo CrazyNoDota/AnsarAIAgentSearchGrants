@@ -24,24 +24,24 @@ async def cmd_subscribe(message: Message):
         status = result.get("status", "")
         if status == "updated":
             await message.answer(
-                "🔔 <b>Already subscribed</b>\n\n"
-                "You will receive:\n"
-                "  • 📅 Deadline reminders (30/14/7/1 days before)\n"
-                "  • 📊 Daily digest at 09:00 (Almaty time)\n\n"
-                "Use /unsubscribe to opt out.",
+                "🔔 <b>Вы уже подписаны</b>\n\n"
+                "Вы будете получать:\n"
+                "  • 📅 Напоминания о дедлайнах (за 30/14/7/1 дн.)\n"
+                "  • 📊 Ежедневную сводку в 09:00 (время Алматы)\n\n"
+                "Чтобы отписаться — /unsubscribe.",
                 parse_mode="HTML",
             )
         else:
             await message.answer(
-                "✅ <b>Subscribed successfully!</b>\n\n"
-                "You will now receive:\n"
-                "  • 📅 Deadline reminders (30/14/7/1 days before)\n"
-                "  • 📊 Daily digest at 09:00 (Almaty time)\n\n"
-                "Use /unsubscribe to opt out.",
+                "✅ <b>Подписка оформлена!</b>\n\n"
+                "Теперь вы будете получать:\n"
+                "  • 📅 Напоминания о дедлайнах (за 30/14/7/1 дн.)\n"
+                "  • 📊 Ежедневную сводку в 09:00 (время Алматы)\n\n"
+                "Чтобы отписаться — /unsubscribe.",
                 parse_mode="HTML",
             )
     except Exception as e:
-        await message.answer(f"❌ Subscription error: {e}")
+        await message.answer(f"❌ Ошибка подписки: {e}")
 
 
 @router.message(Command("unsubscribe"))
@@ -53,18 +53,18 @@ async def cmd_unsubscribe(message: Message):
         result = await api_client.unsubscribe(user_id)
         if result.get("status") == "removed":
             await message.answer(
-                "🔕 <b>Unsubscribed</b>\n\n"
-                "You will no longer receive reminders or digests.\n"
-                "Use /subscribe to opt back in.",
+                "🔕 <b>Вы отписались</b>\n\n"
+                "Напоминания и сводки больше приходить не будут.\n"
+                "Чтобы подписаться снова — /subscribe.",
                 parse_mode="HTML",
             )
         else:
             await message.answer(
-                "You were not subscribed. Use /subscribe to sign up.",
+                "Вы не были подписаны. Чтобы подписаться — /subscribe.",
                 parse_mode="HTML",
             )
     except Exception as e:
-        await message.answer(f"❌ Error: {e}")
+        await message.answer(f"❌ Ошибка: {e}")
 
 
 @router.message(Command("notifications"))
@@ -77,16 +77,16 @@ async def cmd_status(message: Message):
         if result.get("subscribed"):
             since = result.get("since", "")[:10]
             await message.answer(
-                f"🔔 <b>Subscribed</b> since {since}\n\n"
-                "You receive deadline reminders and daily digest.\n"
-                "Use /unsubscribe to opt out.",
+                f"🔔 <b>Подписка активна</b> с {since}\n\n"
+                "Вы получаете напоминания о дедлайнах и ежедневную сводку.\n"
+                "Чтобы отписаться — /unsubscribe.",
                 parse_mode="HTML",
             )
         else:
             await message.answer(
-                "🔕 <b>Not subscribed</b>\n\n"
-                "Use /subscribe to receive deadline reminders and daily digest.",
+                "🔕 <b>Подписка не оформлена</b>\n\n"
+                "Команда /subscribe включит напоминания о дедлайнах и ежедневную сводку.",
                 parse_mode="HTML",
             )
     except Exception as e:
-        await message.answer(f"❌ Error checking status: {e}")
+        await message.answer(f"❌ Не удалось проверить статус: {e}")

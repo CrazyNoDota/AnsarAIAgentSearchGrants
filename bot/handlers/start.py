@@ -17,19 +17,19 @@ async def _build_welcome_text() -> str:
     try:
         stats = await api_client.get_stats()
         return (
-            "👋 <b>AI Grant Discovery System</b>\n\n"
-            "📊 <b>Current Stats:</b>\n"
-            f"  📥 Pending Review: <b>{stats.get('pending', 0)}</b>\n"
-            f"  ✅ Approved: <b>{stats.get('approved', 0)}</b>\n"
-            f"  ❌ Rejected: <b>{stats.get('rejected', 0)}</b>\n"
-            f"  📦 Total: <b>{stats.get('total', 0)}</b>\n\n"
-            "Select an option from the menu below:"
+            "👋 <b>ИИ-агент по поиску грантов</b>\n\n"
+            "📊 <b>Текущая статистика:</b>\n"
+            f"  📥 На рассмотрении: <b>{stats.get('pending', 0)}</b>\n"
+            f"  ✅ Одобрено: <b>{stats.get('approved', 0)}</b>\n"
+            f"  ❌ Отклонено: <b>{stats.get('rejected', 0)}</b>\n"
+            f"  📦 Всего: <b>{stats.get('total', 0)}</b>\n\n"
+            "Выберите пункт меню ниже:"
         )
     except Exception:
         return (
-            "👋 <b>AI Grant Discovery System</b>\n\n"
-            "Automated grant sourcing and recommendations powered by NVIDIA AI.\n\n"
-            "Select an option from the menu below:"
+            "👋 <b>ИИ-агент по поиску грантов</b>\n\n"
+            "Автоматический поиск грантов и рекомендации на базе ИИ NVIDIA.\n\n"
+            "Выберите пункт меню ниже:"
         )
 
 
@@ -53,63 +53,63 @@ async def cmd_menu(message: Message):
 
 
 HELP_TEXT = (
-    "🤖 <b>AI Grant Agent — Command Reference</b>\n\n"
-    "<b>🧭 Navigation</b>\n"
-    "  /start, /menu — main menu\n"
-    "  /guide — how the whole system works\n"
-    "  /help — this list\n\n"
-    "<b>📋 Browse grants</b>\n"
-    "  /pending — new grants awaiting your review\n"
-    "  /approved — grants you approved\n"
-    "  /rejected — grants you rejected\n"
-    "  /deadlines — deadlines in the next 30 days\n\n"
-    "<b>🔎 Find grants</b>\n"
-    "  /search &lt;query&gt; — keyword + semantic search\n"
-    "  /recommend &lt;query&gt; — AI answer grounded in the verified DB\n"
-    "  /summarize &lt;id&gt; — AI summary of one grant\n\n"
-    "<b>🌐 Sources — what gets scraped</b>\n"
-    "  /sources — list your custom sources + health\n"
-    "  /addsource &lt;url&gt; [| name] — add a source to scrape\n"
-    "  /scrapesource &lt;id&gt; — scrape one source now\n"
-    "  /delsource &lt;id&gt; — remove a source\n"
-    "  /scrape — run a full scrape of every source now\n\n"
-    "<b>⚙️ Manage</b>\n"
-    "  /stats — database statistics\n"
-    "  /insights — what the AI has learned from your reviews\n"
-    "  /delete &lt;id&gt; — delete a grant\n"
-    "  /subscribe, /unsubscribe — daily digest\n\n"
-    "<b>✅ Reviewing</b>\n"
-    "Tap ✅ Approve or ❌ Reject under any grant card — the AI learns from every "
-    "decision to sharpen future recommendations.\n\n"
-    "<i>New here? Send /guide for a 1-minute walkthrough.</i>"
+    "🤖 <b>ИИ-агент по грантам — список команд</b>\n\n"
+    "<b>🧭 Навигация</b>\n"
+    "  /start, /menu — главное меню\n"
+    "  /guide — как работает вся система\n"
+    "  /help — этот список\n\n"
+    "<b>📋 Просмотр грантов</b>\n"
+    "  /pending — новые гранты, ждущие вашей проверки\n"
+    "  /approved — одобренные вами гранты\n"
+    "  /rejected — отклонённые вами гранты\n"
+    "  /deadlines — дедлайны в ближайшие 30 дней\n\n"
+    "<b>🔎 Поиск грантов</b>\n"
+    "  /search &lt;запрос&gt; — поиск по ключевым словам + смысловой\n"
+    "  /recommend &lt;запрос&gt; — ответ ИИ строго по проверенной базе\n"
+    "  /summarize &lt;id&gt; — краткое изложение гранта от ИИ\n\n"
+    "<b>🌐 Источники — что сканируется</b>\n"
+    "  /sources — список ваших источников и их состояние\n"
+    "  /addsource &lt;url&gt; [| название] — добавить источник\n"
+    "  /scrapesource &lt;id&gt; — просканировать один источник сейчас\n"
+    "  /delsource &lt;id&gt; — удалить источник\n"
+    "  /scrape — запустить полный сбор по всем источникам\n\n"
+    "<b>⚙️ Управление</b>\n"
+    "  /stats — статистика базы\n"
+    "  /insights — что ИИ понял по вашим решениям\n"
+    "  /delete &lt;id&gt; — удалить грант\n"
+    "  /subscribe, /unsubscribe — ежедневная сводка\n\n"
+    "<b>✅ Проверка</b>\n"
+    "Нажимайте ✅ Одобрить или ❌ Отклонить под карточкой гранта — ИИ учится на "
+    "каждом решении и точнее подбирает гранты в будущем.\n\n"
+    "<i>Впервые здесь? Отправьте /guide — обзор за 1 минуту.</i>"
 )
 
 GUIDE_TEXT = (
-    "📖 <b>How the AI Grant Agent works</b>\n\n"
-    "<b>1. It collects grants</b>\n"
-    "The agent scrapes funding opportunities from three places:\n"
-    "  • 37 built-in sources (gov, EU, UN, accelerators, fellowships…)\n"
-    "  • an AI Search Agent that discovers new pages on the web\n"
-    "  • <b>your own sources</b> — any URL you add with /addsource\n\n"
-    "<b>2. It stores only verified data</b>\n"
-    "Everything found goes into a database as <b>pending</b>. Search and "
-    "recommendations answer ONLY from this database — the AI never invents grants. "
-    "An empty database means nothing has been scraped yet.\n\n"
-    "<b>3. You review</b>\n"
-    "Open /pending and tap ✅/❌ on each card. The AI learns your preferences "
-    "(see /insights) and ranks future finds accordingly.\n\n"
-    "<b>4. You search</b>\n"
-    "  • /search — fast keyword + semantic match\n"
-    "  • /recommend — an AI explanation grounded in the verified grants\n\n"
-    "<b>➕ Adding a source (most common task)</b>\n"
-    "Find a page that lists grants, then:\n"
-    "  <code>/addsource https://site.org/funding | My label</code>\n"
-    "The parser reads that page on every cycle. Pull it in immediately with "
-    "<code>/scrapesource &lt;id&gt;</code>. Check health anytime with /sources.\n\n"
-    "<b>⏰ Automatic updates</b>\n"
-    "A full scrape runs automatically every day at 02:00 (Almaty). Trigger one "
-    "manually anytime with /scrape.\n\n"
-    "<i>Full command list: /help</i>"
+    "📖 <b>Как работает ИИ-агент по грантам</b>\n\n"
+    "<b>1. Он собирает гранты</b>\n"
+    "Агент собирает возможности финансирования из трёх мест:\n"
+    "  • 37 встроенных источников (госорганы, ЕС, ООН, акселераторы, стипендии…)\n"
+    "  • ИИ-агент поиска, который находит новые страницы в интернете\n"
+    "  • <b>ваши собственные источники</b> — любой URL, добавленный через /addsource\n\n"
+    "<b>2. Он хранит только проверенные данные</b>\n"
+    "Всё найденное попадает в базу со статусом <b>на рассмотрении</b>. Поиск и "
+    "рекомендации отвечают ТОЛЬКО по этой базе — ИИ не выдумывает гранты. "
+    "Пустая база значит, что сбор ещё не запускался.\n\n"
+    "<b>3. Вы проверяете</b>\n"
+    "Откройте /pending и жмите ✅/❌ на каждой карточке. ИИ запоминает ваши "
+    "предпочтения (см. /insights) и ранжирует находки соответственно.\n\n"
+    "<b>4. Вы ищете</b>\n"
+    "  • /search — быстрый поиск по словам + по смыслу\n"
+    "  • /recommend — объяснение от ИИ строго по проверенным грантам\n\n"
+    "<b>➕ Добавление источника (самое частое)</b>\n"
+    "Найдите страницу со списком грантов, затем:\n"
+    "  <code>/addsource https://site.org/funding | Моя метка</code>\n"
+    "Парсер читает эту страницу при каждом цикле. Чтобы собрать сразу — "
+    "<code>/scrapesource &lt;id&gt;</code>. Состояние смотрите в /sources.\n\n"
+    "<b>⏰ Автообновление</b>\n"
+    "Полный сбор запускается автоматически каждый день в 02:00 (Алматы). "
+    "Запустить вручную можно в любой момент командой /scrape.\n\n"
+    "<i>Полный список команд: /help</i>"
 )
 
 
@@ -162,13 +162,13 @@ async def menu_recommend(callback: CallbackQuery):
     await callback.answer()
     if callback.message:
         await callback.message.answer(
-            "🤖 <b>AI Recommendations (RAG)</b>\n\n"
-            "Type your query and I'll search our verified grant database:\n\n"
-            "Examples:\n"
-            "  <code>/recommend grants for AI startups</code>\n"
-            "  <code>/recommend university research funding Europe</code>\n"
-            "  <code>/recommend equity-free accelerator programs</code>\n"
-            "  <code>/recommend scholarships Central Asia students</code>",
+            "🤖 <b>Рекомендации ИИ (RAG)</b>\n\n"
+            "Напишите запрос — я найду гранты в нашей проверенной базе:\n\n"
+            "Примеры:\n"
+            "  <code>/recommend гранты для ИИ-стартапов</code>\n"
+            "  <code>/recommend финансирование исследований в Европе</code>\n"
+            "  <code>/recommend акселераторы без доли в капитале</code>\n"
+            "  <code>/recommend стипендии для студентов Центральной Азии</code>",
             parse_mode="HTML",
         )
 
@@ -178,11 +178,11 @@ async def menu_search(callback: CallbackQuery):
     await callback.answer()
     if callback.message:
         await callback.message.answer(
-            "🔍 <b>Search Grants</b>\n\n"
-            "Use hybrid search (keyword + semantic AI):\n\n"
-            "  <code>/search startup grants Kazakhstan</code>\n"
-            "  <code>/search university innovation Europe</code>\n"
-            "  <code>/search no-equity accelerator</code>",
+            "🔍 <b>Поиск грантов</b>\n\n"
+            "Гибридный поиск (ключевые слова + смысловой ИИ):\n\n"
+            "  <code>/search гранты для стартапов Казахстан</code>\n"
+            "  <code>/search инновации в вузах Европа</code>\n"
+            "  <code>/search акселератор без доли</code>",
             parse_mode="HTML",
         )
 
@@ -205,10 +205,10 @@ async def menu_insights(callback: CallbackQuery):
 
 @router.callback_query(F.data == "menu:scrape")
 async def menu_scrape(callback: CallbackQuery):
-    await callback.answer("Starting scraper...")
+    await callback.answer("Запускаю сбор...")
     if callback.message:
         await callback.message.answer(
-            "🔄 <b>Manual Scrape</b>\n\nUse: <code>/scrape</code> to trigger a full scrape run.",
+            "🔄 <b>Ручной сбор</b>\n\nКоманда <code>/scrape</code> запускает полный сбор по всем источникам.",
             parse_mode="HTML",
         )
 

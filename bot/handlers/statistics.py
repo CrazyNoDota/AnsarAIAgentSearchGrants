@@ -15,7 +15,7 @@ async def send_stats(message: Message):
     try:
         stats = await api_client.get_stats()
     except Exception as e:
-        await message.answer(f"❌ Failed to load stats: {e}")
+        await message.answer(f"❌ Не удалось загрузить статистику: {e}")
         return
 
     total = stats.get("total", 0)
@@ -28,13 +28,13 @@ async def send_stats(message: Message):
     approval_rate = round(approved / reviewed * 100) if reviewed > 0 else 0
 
     await message.answer(
-        "📊 <b>System Statistics</b>\n\n"
-        f"📦 <b>Total Grants:</b> {total}\n\n"
-        f"📥 Pending Review: <b>{pending}</b>\n"
-        f"✅ Approved: <b>{approved}</b>\n"
-        f"❌ Rejected: <b>{rejected}</b>\n\n"
-        f"📈 <b>Approval Rate:</b> {approval_rate}% ({reviewed} reviewed)\n\n"
-        f"<i>Use /insights to see AI learning preferences.</i>",
+        "📊 <b>Статистика системы</b>\n\n"
+        f"📦 <b>Всего грантов:</b> {total}\n\n"
+        f"📥 На рассмотрении: <b>{pending}</b>\n"
+        f"✅ Одобрено: <b>{approved}</b>\n"
+        f"❌ Отклонено: <b>{rejected}</b>\n\n"
+        f"📈 <b>Доля одобрений:</b> {approval_rate}% (проверено {reviewed})\n\n"
+        f"<i>Команда /insights покажет, что ИИ понял о ваших предпочтениях.</i>",
         parse_mode="HTML",
     )
 

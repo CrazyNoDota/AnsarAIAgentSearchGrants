@@ -1,7 +1,11 @@
 """Grant card formatter for Telegram messages."""
 from datetime import date
 
-STATUS_RU = {"pending": "PENDING", "approved": "APPROVED", "rejected": "REJECTED"}
+STATUS_RU = {
+    "pending": "НА РАССМОТРЕНИИ",
+    "approved": "ОДОБРЕН",
+    "rejected": "ОТКЛОНЁН",
+}
 
 
 def format_grant(grant: dict, index: int = 1, total: int = 1) -> str:
@@ -12,50 +16,50 @@ def format_grant(grant: dict, index: int = 1, total: int = 1) -> str:
             d = date.fromisoformat(deadline)
             days_left = (d - date.today()).days
             if days_left < 0:
-                deadline_str = f"⚠️ {deadline} (expired)"
+                deadline_str = f"⚠️ {deadline} (истёк)"
             elif days_left == 0:
-                deadline_str = f"🔴 {deadline} (TODAY)"
+                deadline_str = f"🔴 {deadline} (СЕГОДНЯ)"
             elif days_left <= 3:
-                deadline_str = f"🔴 {deadline} ({days_left}d left)"
+                deadline_str = f"🔴 {deadline} (осталось {days_left} дн.)"
             elif days_left <= 7:
-                deadline_str = f"🟡 {deadline} ({days_left}d left)"
+                deadline_str = f"🟡 {deadline} (осталось {days_left} дн.)"
             elif days_left <= 14:
-                deadline_str = f"🔵 {deadline} ({days_left}d left)"
+                deadline_str = f"🔵 {deadline} (осталось {days_left} дн.)"
             else:
-                deadline_str = f"🟢 {deadline} ({days_left}d left)"
+                deadline_str = f"🟢 {deadline} (осталось {days_left} дн.)"
         except ValueError:
             deadline_str = deadline
     else:
-        deadline_str = "Not specified"
+        deadline_str = "Не указан"
 
     ai_score = grant.get("ai_score", 0)
     score_pct = min(100, max(0, int(ai_score))) if isinstance(ai_score, (int, float)) else 0
 
     lines = [
-        f"📌 <b>Grant {index}/{total}</b>",
+        f"📌 <b>Грант {index}/{total}</b>",
         "",
-        f"<b>{grant.get('title', 'Untitled')}</b>",
+        f"<b>{grant.get('title', 'Без названия')}</b>",
         "",
-        f"🏢 <b>Org:</b> {grant.get('organization') or 'N/A'}",
-        f"🌍 <b>Country:</b> {grant.get('country') or 'N/A'}",
-        f"🏷 <b>Category:</b> {grant.get('category') or 'N/A'}",
+        f"🏢 <b>Организация:</b> {grant.get('organization') or '—'}",
+        f"🌍 <b>Страна:</b> {grant.get('country') or '—'}",
+        f"🏷 <b>Категория:</b> {grant.get('category') or '—'}",
     ]
 
     if grant.get("industry"):
-        lines.append(f"🏭 <b>Industry:</b> {grant['industry']}")
+        lines.append(f"🏭 <b>Отрасль:</b> {grant['industry']}")
 
     if grant.get("startup_stage"):
-        lines.append(f"📈 <b>Stage:</b> {grant['startup_stage']}")
+        lines.append(f"📈 <b>Стадия:</b> {grant['startup_stage']}")
 
-    amount = grant.get("grant_amount") or "Not specified"
-    lines.append(f"💰 <b>Amount:</b> {amount}")
+    amount = grant.get("grant_amount") or "Не указана"
+    lines.append(f"💰 <b>Сумма:</b> {amount}")
 
-    lines.append(f"📅 <b>Deadline:</b> {deadline_str}")
+    lines.append(f"📅 <b>Дедлайн:</b> {deadline_str}")
 
     if score_pct > 0:
         bar_len = min(10, score_pct // 10)
         bar = "▓" * bar_len + "░" * (10 - bar_len)
-        lines.append(f"🤖 <b>AI Score:</b> {bar} {score_pct}%")
+        lines.append(f"🤖 <b>Оценка ИИ:</b> {bar} {score_pct}%")
 
     description = grant.get("description", "")
     if description:
@@ -64,19 +68,19 @@ def format_grant(grant: dict, index: int = 1, total: int = 1) -> str:
 
     if grant.get("eligibility"):
         elig = grant["eligibility"][:150] + "…" if len(grant["eligibility"]) > 150 else grant["eligibility"]
-        lines += ["", f"✅ <b>Eligibility:</b> {elig}"]
+        lines += ["", f"✅ <b>Кто может подать:</b> {elig}"]
 
     source_url = grant.get("source_url", "")
     app_url = grant.get("application_url", "")
     if source_url:
-        lines += ["", f'🔗 <a href="{source_url}">View Grant</a>']
+        lines += ["", f'🔗 <a href="{source_url}">Открыть грант</a>']
     if app_url and app_url != source_url:
-        lines.append(f'📋 <a href="{app_url}">Apply Here</a>')
+        lines.append(f'📋 <a href="{app_url}">Подать заявку</a>')
 
     status = grant.get("status", "pending")
     lines += [
         "",
-        f"🆔 ID: <code>{grant.get('id')}</code>  |  Status: <b>{STATUS_RU.get(status, status.upper())}</b>",
+        f"🆔 ID: <code>{grant.get('id')}</code>  |  Статус: <b>{STATUS_RU.get(status, status.upper())}</b>",
     ]
 
     return "\n".join(lines)

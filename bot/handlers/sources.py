@@ -51,14 +51,14 @@ _STATUS_ICON = {"ok": "🟢", "error": "🔴", None: "⚪️"}
 
 def _format_source(s: dict) -> str:
     icon = _STATUS_ICON.get(s.get("last_status"), "⚪️")
-    enabled = "" if s.get("enabled", True) else " <i>(disabled)</i>"
+    enabled = "" if s.get("enabled", True) else " <i>(отключён)</i>"
     name = _esc(s.get("name") or s.get("url"))
     line = f"{icon} <b>#{s['id']}</b> {name}{enabled}\n     {_esc(s['url'])}"
     last = s.get("last_scraped_at")
     if last:
         line += (
-            f"\n     last run: {_esc(last[:10])} · "
-            f"+{s.get('last_count', 0)} new · {_esc(s.get('last_status') or '—')}"
+            f"\n     последний сбор: {_esc(last[:10])} · "
+            f"+{s.get('last_count', 0)} новых · {_esc(s.get('last_status') or '—')}"
         )
     if s.get("last_status") == "error" and s.get("last_error"):
         line += f"\n     ⚠️ {_esc(s['last_error'][:160])}"
@@ -66,16 +66,17 @@ def _format_source(s: dict) -> str:
 
 
 _ADD_HELP = (
-    "🌐 <b>Add a Grant Source</b>\n\n"
-    "Register any page that lists grants/funding — the AI parser will read it on "
-    "every scrape cycle and add what it finds to your review queue.\n\n"
-    "Usage:\n"
+    "🌐 <b>Добавить источник грантов</b>\n\n"
+    "Зарегистрируйте любую страницу со списком грантов/финансирования — ИИ-парсер "
+    "будет читать её при каждом цикле сбора и добавлять найденное в очередь "
+    "проверки.\n\n"
+    "Использование:\n"
     "  <code>/addsource &lt;url&gt;</code>\n"
-    "  <code>/addsource &lt;url&gt; | Friendly name</code>\n\n"
-    "Examples:\n"
+    "  <code>/addsource &lt;url&gt; | Понятное название</code>\n\n"
+    "Примеры:\n"
     "  <code>/addsource https://astanahub.com/en/grants</code>\n"
-    "  <code>/addsource https://example.org/funding | Tourism KZ</code>\n\n"
-    "<i>Tip: point it at a list/listing page, not a single grant.</i>"
+    "  <code>/addsource https://example.org/funding | Туризм KZ</code>\n\n"
+    "<i>Совет: указывайте страницу со списком грантов, а не один грант.</i>"
 )
 
 
@@ -84,23 +85,23 @@ async def send_sources(message: Message):
     try:
         sources = await api_client.list_sources()
     except Exception as e:
-        await message.answer(f"❌ Failed to load sources: {_esc(_format_error(e))}")
+        await message.answer(f"❌ Не удалось загрузить источники: {_esc(_format_error(e))}")
         return
 
     if not sources:
         await message.answer(
-            "🌐 <b>Custom Grant Sources</b>\n\n"
-            "No custom sources yet. The agent currently scrapes only the built-in "
-            "sources + the AI Search Agent.\n\n" + _ADD_HELP,
+            "🌐 <b>Свои источники грантов</b>\n\n"
+            "Своих источников пока нет. Сейчас агент сканирует только встроенные "
+            "источники + ИИ-агент поиска.\n\n" + _ADD_HELP,
             parse_mode="HTML",
             disable_web_page_preview=True,
         )
         return
 
-    lines = [f"🌐 <b>Custom Grant Sources</b> ({len(sources)})\n"]
+    lines = [f"🌐 <b>Свои источники грантов</b> ({len(sources)})\n"]
     lines.extend(_format_source(s) for s in sources)
     lines.append(
-        "\n<i>Manage:</i> <code>/addsource &lt;url&gt;</code> · "
+        "\n<i>Управление:</i> <code>/addsource &lt;url&gt;</code> · "
         "<code>/scrapesource &lt;id&gt;</code> · <code>/delsource &lt;id&gt;</code>"
     )
     await message.answer(
@@ -139,24 +140,24 @@ async def cmd_addsource(message: Message):
     try:
         result = await api_client.add_source(url, name=name, added_by=added_by)
     except Exception as e:
-        await message.answer(f"❌ Could not add source: {_esc(_format_error(e))}")
+        await message.answer(f"❌ Не удалось добавить источник: {_esc(_format_error(e))}")
         return
 
     source = result.get("source", {})
     sid = source.get("id")
     if result.get("status") == "exists":
         await message.answer(
-            f"ℹ️ That URL is already registered as <b>#{sid}</b> (re-enabled).\n"
-            f"Run it now with <code>/scrapesource {sid}</code>.",
+            f"ℹ️ Этот URL уже зарегистрирован как <b>#{sid}</b> (снова включён).\n"
+            f"Запустить сейчас: <code>/scrapesource {sid}</code>.",
             parse_mode="HTML",
             disable_web_page_preview=True,
         )
         return
 
     await message.answer(
-        f"✅ <b>Source added</b> — #{sid}\n"
+        f"✅ <b>Источник добавлен</b> — #{sid}\n"
         f"{_esc(source.get('name') or source.get('url'))}\n\n"
-        f"It will be scraped on the next cycle. To pull it in now:\n"
+        f"Он будет просканирован на следующем цикле. Чтобы собрать сейчас:\n"
         f"<code>/scrapesource {sid}</code>",
         parse_mode="HTML",
         disable_web_page_preview=True,
@@ -168,10 +169,10 @@ async def cmd_delsource(message: Message):
     parts = message.text.split(maxsplit=1) if message.text else []
     if len(parts) < 2 or not parts[1].strip().isdigit():
         await message.answer(
-            "🗑 <b>Remove a Source</b>\n\n"
-            "Usage: <code>/delsource &lt;id&gt;</code>\n"
-            "Example: <code>/delsource 3</code>\n\n"
-            "<i>See IDs with /sources. Grants already collected are kept.</i>",
+            "🗑 <b>Удалить источник</b>\n\n"
+            "Использование: <code>/delsource &lt;id&gt;</code>\n"
+            "Пример: <code>/delsource 3</code>\n\n"
+            "<i>ID смотрите в /sources. Уже собранные гранты сохраняются.</i>",
             parse_mode="HTML",
         )
         return
@@ -179,9 +180,9 @@ async def cmd_delsource(message: Message):
     source_id = int(parts[1].strip())
     try:
         await api_client.delete_source(source_id)
-        await message.answer(f"🗑 Source #{source_id} removed.", parse_mode="HTML")
+        await message.answer(f"🗑 Источник #{source_id} удалён.", parse_mode="HTML")
     except Exception as e:
-        await message.answer(f"❌ Delete failed: {_esc(_format_error(e))}")
+        await message.answer(f"❌ Не удалось удалить: {_esc(_format_error(e))}")
 
 
 @router.message(Command("scrapesource"))
@@ -189,23 +190,23 @@ async def cmd_scrapesource(message: Message):
     parts = message.text.split(maxsplit=1) if message.text else []
     if len(parts) < 2 or not parts[1].strip().isdigit():
         await message.answer(
-            "🔄 <b>Scrape One Source</b>\n\n"
-            "Usage: <code>/scrapesource &lt;id&gt;</code>\n"
-            "Example: <code>/scrapesource 3</code>\n\n"
-            "<i>See IDs with /sources.</i>",
+            "🔄 <b>Просканировать один источник</b>\n\n"
+            "Использование: <code>/scrapesource &lt;id&gt;</code>\n"
+            "Пример: <code>/scrapesource 3</code>\n\n"
+            "<i>ID смотрите в /sources.</i>",
             parse_mode="HTML",
         )
         return
 
     source_id = int(parts[1].strip())
     await message.answer(
-        f"🔄 Scraping source #{source_id}...\n<i>This may take up to a minute.</i>",
+        f"🔄 Сканирую источник #{source_id}...\n<i>Это может занять до минуты.</i>",
         parse_mode="HTML",
     )
     try:
         result = await api_client.run_source(source_id)
     except Exception as e:
-        await message.answer(f"❌ Scrape failed: {_esc(_format_error(e))}")
+        await message.answer(f"❌ Сбор не удался: {_esc(_format_error(e))}")
         return
 
     new = result.get("new", 0)
@@ -217,14 +218,14 @@ async def cmd_scrapesource(message: Message):
         # Surface the first source-level error message if present.
         for label, s in by_source.items():
             if s.get("errors"):
-                detail = f"\n⚠️ {_esc(label)}: check the URL is a reachable listing page."
+                detail = f"\n⚠️ {_esc(label)}: проверьте, что URL — доступная страница со списком."
                 break
 
     await message.answer(
-        f"✅ <b>Source #{source_id} scraped</b>\n\n"
-        f"📦 Found: <b>{total}</b>\n"
-        f"🆕 New: <b>{new}</b> added to review queue\n"
-        f"⚠️ Errors: {errors}{detail}",
+        f"✅ <b>Источник #{source_id} просканирован</b>\n\n"
+        f"📦 Найдено: <b>{total}</b>\n"
+        f"🆕 Новых: <b>{new}</b> добавлено в очередь проверки\n"
+        f"⚠️ Ошибок: {errors}{detail}",
         parse_mode="HTML",
     )
 
